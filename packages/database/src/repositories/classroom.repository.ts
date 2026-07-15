@@ -14,7 +14,10 @@ import {
 type ClassroomClient = Pick<PrismaClient, "classroom">;
 
 export type CreateClassroomInput = TenantScope &
-  Pick<Prisma.ClassroomCreateManyInput, "code" | "name" | "gradeLevel" | "isActive">;
+  Pick<
+    Prisma.ClassroomCreateManyInput,
+    "code" | "name" | "gradeLevel" | "homeroomTeacherId" | "isActive"
+  >;
 
 export type ListClassroomsInput = TenantScope & {
   gradeLevel?: string;
@@ -25,8 +28,8 @@ export type ListClassroomsInput = TenantScope & {
 export type UpdateClassroomInput = TenantScope & {
   classroomId: string;
   data: Pick<
-    Prisma.ClassroomUpdateManyMutationInput,
-    "name" | "gradeLevel" | "isActive"
+    Prisma.ClassroomUncheckedUpdateInput,
+    "name" | "gradeLevel" | "homeroomTeacherId" | "isActive"
   >;
 };
 
@@ -35,10 +38,10 @@ export async function createClassroomForSchool(
   input: CreateClassroomInput,
 ): Promise<Classroom> {
   const schoolId = requireSchoolId(input);
-  const { code, name, gradeLevel, isActive } = input;
+  const { code, name, gradeLevel, homeroomTeacherId, isActive } = input;
 
   return client.classroom.create({
-    data: { schoolId, code, name, gradeLevel, isActive },
+    data: { schoolId, code, name, gradeLevel, homeroomTeacherId, isActive },
   });
 }
 

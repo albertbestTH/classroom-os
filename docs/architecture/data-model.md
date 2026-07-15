@@ -21,6 +21,7 @@ The Sprint 2 schema establishes the PostgreSQL foundation for teacher-led classr
 | `AttendanceRecord` | One student's attendance outcome for one class session. |
 | `Assessment` | Scored activity for a term, classroom, subject, and teacher; optionally created in a class session. |
 | `Score` | One student's result for one assessment. |
+| `AuditLog` | Immutable tenant-scoped record of a service mutation, optional actor, target entity, safe metadata, and timestamp. |
 
 ## Major relationships
 
@@ -69,6 +70,8 @@ erDiagram
     Assessment ||--o{ Score : produces
     Student ||--o{ Score : earns
     Teacher o|--o{ Score : grades
+    School ||--o{ AuditLog : owns
+    User o|--o{ AuditLog : acts
 ```
 
 ## Tenant boundaries
@@ -93,6 +96,8 @@ Creating a session from a timetable entry runs in a transaction. The repository 
 
 These helpers reduce accidental leakage but do not replace authorization, composite tenant foreign keys, or future PostgreSQL row-level security.
 
+Application services are the supported business boundary. Each method requires `schoolId`, validates input before persistence, uses scoped repositories, and maps expected errors to stable transport-neutral codes. Cross-tenant and missing lookups use non-disclosing not-found behavior. Authentication will eventually provide trusted tenant and actor context; it is not implemented in this sprint.
+
 ## Operational lifecycle
 
 ```mermaid
@@ -109,6 +114,18 @@ flowchart LR
 3. The application materializes a dated `ClassSession`. The session stores teacher, classroom, subject, and scheduled timestamps as an operational snapshot and may reference the originating timetable entry. Ad hoc sessions leave that reference empty.
 4. The current term's `ClassEnrollment` rows determine the expected roster. Each student can have at most one attendance record per session.
 5. An `Assessment` may reference the session where it was created. Each student can have at most one score per assessment.
+6. Every successful service mutation appends a sanitized `AuditLog` in the same database transaction.
+
+## Service-enforced rules
+
+- Only `scheduled` sessions transition to `live`; only `live` sessions transition to `completed`.
+- Attendance and linked assessment scores cannot be changed after a session is completed or cancelled.
+- Attendance and scores are accepted only for active enrollment in the matching term and classroom.
+- Score values must be between zero and the assessment maximum.
+- Timetable intervals must use Monday-Friday, have increasing times, and must not overlap another active entry for the same teacher or classroom in the term.
+- Batch inputs reject duplicate student IDs before persistence.
+
+PostgreSQL uniqueness constraints remain the final authority for exact duplicates. Interval overlap and lifecycle rules are transactionally checked by services but are not yet protected by exclusion/check constraints against every possible concurrent writer.
 
 ## Enforced invariants
 
@@ -120,8 +137,9 @@ flowchart LR
 - At most one score for a student on an assessment.
 - At most one scheduled occurrence for a classroom or teacher at the same term, weekday, and start time.
 - Timestamps on all core entities, with automatic `updatedAt` maintenance.
+- Tenant/entity/time indexes for audit history queries.
 
-Rules such as `startTime < endTime`, valid weekday range, interval-overlap prevention, date ordering, non-negative scores, and score values not exceeding an assessment's maximum require service validation and may later be reinforced with reviewed PostgreSQL check constraints, exclusion constraints, or triggers in the first migration. The service must also maintain at most one current academic year and term per school, and normalize case for email and business-code uniqueness.
+Rules such as `startTime < endTime`, valid weekday range, interval-overlap prevention, non-negative scores, and score values not exceeding an assessment's maximum are enforced by the application services. They may later be reinforced with reviewed PostgreSQL check constraints or exclusion constraints. The service must also maintain at most one current academic year and term per school, and normalize case for email and business-code uniqueness.
 
 ## Runtime verification
 

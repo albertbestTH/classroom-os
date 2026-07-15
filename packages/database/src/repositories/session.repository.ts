@@ -13,6 +13,10 @@ import {
 } from "../tenant.js";
 
 type SessionReadClient = Pick<PrismaClient, "classSession">;
+type SessionWriteClient = Pick<
+  PrismaClient,
+  "classSession" | "timetableEntry" | "term" | "teacher" | "classroom" | "subject"
+>;
 
 export type ListClassSessionsInput = TenantScope & {
   classroomId?: string;
@@ -74,6 +78,15 @@ export async function createSessionFromTimetableForSchool(
   client: PrismaClient,
   input: CreateSessionFromTimetableInput,
 ): Promise<ClassSession> {
+  return client.$transaction((transaction) =>
+    createSessionFromTimetableInScopeForSchool(transaction, input),
+  );
+}
+
+export async function createSessionFromTimetableInScopeForSchool(
+  client: SessionWriteClient,
+  input: CreateSessionFromTimetableInput,
+): Promise<ClassSession> {
   const schoolId = requireSchoolId(input);
   const timetableEntryId = requireRecordId(
     input.timetableEntryId,
@@ -90,8 +103,7 @@ export async function createSessionFromTimetableForSchool(
     );
   }
 
-  return client.$transaction(async (transaction) => {
-    const timetableEntry = await transaction.timetableEntry.findUnique({
+  const timetableEntry = await client.timetableEntry.findUnique({
       where: { id: timetableEntryId, schoolId, isActive: true },
       select: {
         id: true,
@@ -106,19 +118,19 @@ export async function createSessionFromTimetableForSchool(
       throw new TenantRecordNotFoundError("TimetableEntry");
     }
 
-    const term = await transaction.term.findUnique({
+    const term = await client.term.findUnique({
       where: { id: timetableEntry.termId, schoolId },
       select: { id: true },
     });
-    const teacher = await transaction.teacher.findUnique({
+    const teacher = await client.teacher.findUnique({
       where: { id: timetableEntry.teacherId, schoolId },
       select: { id: true },
     });
-    const classroom = await transaction.classroom.findUnique({
+    const classroom = await client.classroom.findUnique({
       where: { id: timetableEntry.classroomId, schoolId },
       select: { id: true },
     });
-    const subject = await transaction.subject.findUnique({
+    const subject = await client.subject.findUnique({
       where: { id: timetableEntry.subjectId, schoolId },
       select: { id: true },
     });
@@ -127,7 +139,7 @@ export async function createSessionFromTimetableForSchool(
       throw new TenantRecordNotFoundError("TimetableEntry");
     }
 
-    return transaction.classSession.create({
+    return client.classSession.create({
       data: {
         schoolId,
         termId: timetableEntry.termId,
@@ -140,7 +152,6 @@ export async function createSessionFromTimetableForSchool(
         notes: input.notes,
       },
     });
-  });
 }
 
 export async function updateClassSessionStatusForSchool(
@@ -158,4 +169,28 @@ export async function updateClassSessionStatusForSchool(
   } catch (error) {
     rethrowScopedMutationError(error, "ClassSession");
   }
+}
+
+export async function transitionClassSessionForSchool(
+  client: SessionReadClient,
+  input: TenantScope & {
+    sessionId: string;
+    fromStatus: SessionStatus;
+    toStatus: SessionStatus;
+    occurredAt: Date;
+  },
+): Promise<ClassSession | null> {
+  const schoolId = requireSchoolId(input);
+  const sessionId = requireRecordId(input.sessionId, "sessionId");
+  const update = await client.classSession.updateMany({
+    where: { id: sessionId, schoolId, status: input.fromStatus },
+    data: {
+      status: input.toStatus,
+      ...(input.toStatus === "live" ? { startedAt: input.occurredAt } : {}),
+      ...(input.toStatus === "completed" ? { endedAt: input.occurredAt } : {}),
+    },
+  });
+
+  if (update.count === 0) return null;
+  return requireClassSessionForSchool(client, { schoolId, sessionId });
 }

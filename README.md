@@ -41,3 +41,13 @@ pnpm db:migrate
 ```
 
 This reset is destructive and is never performed by the normal `db:down` script.
+
+## Service foundation
+
+`@classroom-os/database` exposes tenant-scoped application services for students, classrooms, timetables, sessions, attendance, and assessments. Every public method requires `schoolId`, validates API-facing input with Zod, returns serializable contracts from `@classroom-os/types`, and maps expected failures to stable domain error codes.
+
+Mutation services write a sanitized `AuditLog` in the same transaction as the domain change. Authentication and HTTP routes are intentionally not implemented yet; a future trusted server boundary must derive `schoolId` and `actorUserId` rather than accepting them from an untrusted client.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It provisions an ephemeral PostgreSQL 16 service, installs pnpm through Corepack, restores the pnpm store cache, applies committed migrations with `prisma migrate deploy`, and then runs database tests, lint, and build. CI uses synthetic data and a CI-only database password.

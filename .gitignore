@@ -3,3 +3,4 @@ node_modules
 packages/database/.env
 packages/database/dist
 packages/database/src/generated
+packages/types/dist

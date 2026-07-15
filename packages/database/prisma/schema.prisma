@@ -61,6 +61,7 @@ model School {
   attendanceRecords   AttendanceRecord[]
   assessments         Assessment[]
   scores              Score[]
+  auditLogs           AuditLog[]
 
   @@index([isActive])
 }
@@ -121,6 +122,7 @@ model User {
   school                    School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   teacherProfile            Teacher?           @relation("TeacherUser")
   recordedAttendanceRecords AttendanceRecord[] @relation("AttendanceRecorder")
+  auditLogs                 AuditLog[]         @relation("AuditActor")
 
   @@unique([schoolId, email])
   @@index([schoolId, role, isActive])
@@ -392,4 +394,22 @@ model Score {
   @@unique([assessmentId, studentId])
   @@index([schoolId, studentId, gradedAt])
   @@index([schoolId, assessmentId])
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId    String   @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String   @db.Uuid
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  actor  User?  @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
 }

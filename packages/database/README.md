@@ -74,32 +74,37 @@ Never commit `.env` or a real credential. Runtime errors and test output must no
 
 The initial migration is `init_classroom_core`. Its SQL uses PostgreSQL-native `gen_random_uuid()` defaults and preserves the unique constraints for enrollment, attendance, and scores.
 
+The second migration is `add_audit_log`. It adds the tenant-scoped audit table, optional actor foreign key, JSON metadata, and indexes for tenant/time and entity-history queries.
+
 Do not rewrite a migration after it is shared or applied outside a disposable environment. Create a follow-up migration instead.
 
 ## Tenant-safe runtime usage
 
-The package does not construct a client at module import time. `getPrismaClient()` lazily creates one process-level client, preventing extra PostgreSQL pools during development hot reload. It fails clearly when `DATABASE_URL` is missing and never logs the URL.
+The package does not construct a client at module import time. Internally, a lazy process-level client prevents extra PostgreSQL pools during development hot reload. It fails clearly when `DATABASE_URL` is missing and never logs the URL.
 
-Repository operations require `schoolId` explicitly:
+Application code calls services with an explicit `schoolId`:
 
 ```ts
 import {
-  getPrismaClient,
-  listStudentsForSchool,
-  requireClassSessionForSchool,
+  getClassSession,
+  listStudents,
 } from "@classroom-os/database";
 
-const prisma = getPrismaClient();
-const students = await listStudentsForSchool(prisma, { schoolId });
-const session = await requireClassSessionForSchool(prisma, {
-  schoolId,
-  sessionId,
-});
+const students = await listStudents({ schoolId });
+const session = await getClassSession({ schoolId, sessionId });
 ```
 
 Repositories use tenant-scoped reads and mutations. Missing and cross-tenant records produce the same `TenantRecordNotFoundError`, preventing record-existence disclosure. Session creation derives teacher, classroom, subject, and term from a scoped timetable entry inside a transaction.
 
-Direct Prisma access is still possible inside trusted server modules, so service code must continue to verify that every related record belongs to the active school. The raw database package must never be imported into browser or mobile bundles.
+The package root does not export Prisma Client or repositories. They remain internal persistence details used by services and database tests. The server-only database package must never be imported into browser or mobile bundles.
+
+## Application services
+
+Application code should call the service modules rather than repositories. Every public service method requires `schoolId`; mutations optionally accept `actorUserId`, validate with Zod, execute business changes and audit writes transactionally, and return API-facing contracts from `@classroom-os/types`.
+
+Services enforce session transitions, completed-session immutability, active enrollment for attendance and scores, assessment maximums, and teacher/classroom timetable overlap. Expected failures use `NOT_FOUND`, `TENANT_ACCESS_DENIED`, `CONFLICT`, `VALIDATION_ERROR`, or `INVALID_STATE_TRANSITION`. Database error messages and connection information are never returned.
+
+Audit metadata is deliberately narrow. Never place passwords, secrets, tokens, full request bodies, biometric data, or production credentials in `metadata`.
 
 ## Integration tests
 
@@ -113,7 +118,11 @@ pnpm db:test
 
 The safety guard refuses non-local hosts and any database name other than `classroom_os`. Factories create obviously synthetic schools, users, teachers, and students with unique identifiers. Every test deletes its own records in foreign-key-safe order; it never truncates unrelated data or relies on row order.
 
-The suite verifies tenant isolation, enrollment/attendance/score uniqueness, timetable-to-session materialization, and cross-tenant session denial.
+The suite verifies schema validation, tenant isolation, enrollment/attendance/score uniqueness, timetable-to-session materialization, session transitions, enrollment and score rules, teacher/classroom overlap detection, stable error codes, and audit creation.
+
+## CI database lifecycle
+
+GitHub Actions starts a fresh PostgreSQL 16 service for each job and supplies a CI-only `DATABASE_URL`. CI runs `prisma migrate deploy` against that empty service, executes synthetic tests, then discards the service automatically. CI never runs `prisma migrate dev`, creates migration files, or touches the local named volume.
 
 ## Local data reset
 

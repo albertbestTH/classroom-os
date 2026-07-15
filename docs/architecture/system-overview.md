@@ -45,3 +45,13 @@ Application routes will call server-side services, and those services will use `
 The production posture requires tenant isolation, RBAC, audit logs, encryption, retention controls, least-privilege database credentials, and reviewed migrations. PostgreSQL row-level security should be evaluated as defense in depth before real tenant data is introduced.
 
 Biometric and face-recognition storage is not part of the current data model. No real student data or production database URL belongs in the repository.
+
+## Application service boundary
+
+Server-side callers use six focused services: student, classroom, timetable, session, attendance, and assessment. Public service methods require `schoolId`, accept shared API contracts, validate with Zod, call only tenant-scoped repositories, and serialize Prisma dates and decimals into API-safe results. Prisma Client remains an internal persistence concern and must not cross the service boundary.
+
+Services own workflow rules and transaction boundaries. Repositories own tenant-qualified persistence operations. Zod schemas own request shape and primitive validation. Stable domain errors own the future transport-neutral mapping to HTTP responses.
+
+Mutation transactions also create an `AuditLog` with actor, action, entity, safe metadata, and timestamp. Audit metadata must never contain credentials, tokens, secrets, or biometric data.
+
+GitHub Actions validates this boundary against an ephemeral PostgreSQL 16 service. CI applies the committed migration history with `prisma migrate deploy`; it never creates development migrations or persists the service volume.

@@ -1,17 +1,20 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  createPrismaClient,
   createSessionFromTimetableForSchool,
-  listClassroomsForSchool,
-  listStudentsForSchool,
-  Prisma,
-  requireClassroomForSchool,
   requireClassSessionForSchool,
+} from "../../src/repositories/session.repository.js";
+import { createPrismaClient } from "../../src/client.js";
+import { Prisma, type PrismaClient } from "../../src/generated/prisma/client.js";
+import {
+  listClassroomsForSchool,
+  requireClassroomForSchool,
+} from "../../src/repositories/classroom.repository.js";
+import {
+  listStudentsForSchool,
   requireStudentForSchool,
-  TenantRecordNotFoundError,
-  type PrismaClient,
-} from "../../src/index.js";
+} from "../../src/repositories/student.repository.js";
+import { TenantRecordNotFoundError } from "../../src/tenant.js";
 import {
   cleanupSyntheticSchools,
   requireSafeIntegrationDatabaseUrl,
