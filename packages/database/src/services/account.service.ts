@@ -72,7 +72,12 @@ type StaffRecord = {
   status: StaffUserResult["status"];
   lastLoginAt: Date | null;
   createdAt: Date;
-  teacherProfile: { id: string; employeeCode: string } | null;
+  teacherProfile: {
+    id: string;
+    employeeCode: string;
+    isActive: boolean;
+    _count: { teachingAssignments: number };
+  } | null;
 };
 
 function toStaffResult(user: StaffRecord): StaffUserResult {
@@ -86,6 +91,8 @@ function toStaffResult(user: StaffRecord): StaffUserResult {
     status: user.status,
     teacherId: user.teacherProfile?.id ?? null,
     employeeCode: user.teacherProfile?.employeeCode ?? null,
+    teacherIsActive: user.teacherProfile?.isActive ?? null,
+    assignmentCount: user.teacherProfile?._count?.teachingAssignments ?? 0,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
   };
@@ -105,8 +112,28 @@ function toAssignmentResult(
     termId: assignment.termId,
     classroomId: assignment.classroomId,
     subjectId: assignment.subjectId,
+    teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
+    classroomName: assignment.classroom.name,
+    subjectCode: assignment.subject.code,
+    subjectName: assignment.subject.name,
+    termName: assignment.term.name,
+    academicYearName: assignment.term.academicYear.name,
     createdAt: assignment.createdAt.toISOString(),
   };
+}
+
+export async function getStaffUser(
+  input: AuthenticatedServiceInput & { userId: string },
+): Promise<StaffUserResult> {
+  const auth = requireAccountManager(input.auth);
+  const userId = parseInput(uuid, input.userId);
+  return withDomainErrors(async () => {
+    const user = await requireStaffUserForSchool(getPrismaClient(), {
+      schoolId: auth.schoolId,
+      userId,
+    });
+    return toStaffResult(user);
+  });
 }
 
 export async function listStaffUsers(

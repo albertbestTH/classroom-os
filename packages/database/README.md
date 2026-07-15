@@ -113,6 +113,10 @@ Account-management services are the exception to caller-supplied tenant scope: t
 
 Temporary passwords are required explicitly when creating staff, checked against the same Argon2id policy, hashed before persistence, and never returned or written to audit metadata. Admins can manage admin/teacher accounts but cannot create or modify an owner; teachers cannot manage staff.
 
+Subject and academic-calendar services provide tenant-scoped catalog administration for the web console. Current year and term changes are transactional, audited, date-validated, and reinforced by the `enforce_current_academic_periods` partial unique indexes. Term dates must remain inside their parent academic year.
+
+Teaching-assignment results include safe display labels for teacher, classroom, subject, term, and year. The database uniqueness constraint keeps exact duplicates out while allowing the same teacher and subject to remain distinct across multiple classrooms.
+
 ## Authentication and authorization
 
 Passwords are hashed with Argon2id using the package's centralized policy. Password creation requires 12-128 characters, upper/lowercase letters, a number, a symbol, and rejection of common weak fragments. Plaintext passwords exist only for the duration of verification/hashing and are never logged or persisted.

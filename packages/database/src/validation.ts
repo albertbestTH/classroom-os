@@ -66,14 +66,15 @@ export const updateClassroomSchema = z
   .object({
     ...tenantFields,
     classroomId: uuid("classroomId"),
+    code: trimmedText("code").optional(),
     name: trimmedText("name").optional(),
     gradeLevel: trimmedText("gradeLevel").optional(),
     homeroomTeacherId: uuid("homeroomTeacherId").nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .refine(
-    ({ name, gradeLevel, homeroomTeacherId, isActive }) =>
-      [name, gradeLevel, homeroomTeacherId, isActive].some(
+    ({ code, name, gradeLevel, homeroomTeacherId, isActive }) =>
+      [code, name, gradeLevel, homeroomTeacherId, isActive].some(
         (value) => value !== undefined,
       ),
     { message: "At least one classroom field must be updated." },

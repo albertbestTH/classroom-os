@@ -29,6 +29,7 @@ export async function PATCH(request: NextRequest, route: ClassroomRouteContext) 
       return updateClassroom(
         trustedTenantInput(context, {
           classroomId: id,
+          code: optionalString(body, "code"),
           name: optionalString(body, "name"),
           gradeLevel: optionalString(body, "gradeLevel"),
           isActive: optionalBoolean(body, "isActive"),

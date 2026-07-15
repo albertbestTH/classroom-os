@@ -32,6 +32,18 @@ export async function requireWebSession(): Promise<ResolvedSessionResult> {
   return session;
 }
 
+export async function requireAdminWebSession(): Promise<ResolvedSessionResult> {
+  const session = await requireWebSession();
+  if (session.context.role === "TEACHER") redirect("/");
+  return session;
+}
+
+export async function requireOwnerWebSession(): Promise<ResolvedSessionResult> {
+  const session = await requireWebSession();
+  if (session.context.role !== "SCHOOL_OWNER") redirect("/");
+  return session;
+}
+
 export async function setWebSessionCookie(token: string, expiresAt: Date): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(AUTH_COOKIE_NAME, token, sessionCookieOptions(expiresAt));

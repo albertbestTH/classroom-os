@@ -62,7 +62,19 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `POST /api/assessments`; `PUT /api/assessments/:id/scores`
 - `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
 - `GET|POST /api/staff/:id/teaching-assignments`; `GET /api/teaching-assignments`
+- `GET /api/staff/:id`
+- `GET|POST /api/subjects`; `PATCH /api/subjects/:id`
+- `GET|POST /api/academic-years`; `PATCH /api/academic-years/:id`
+- `GET|POST /api/terms`; `PATCH /api/terms/:id`
 
 Timetable and assessment creation accept a `teachingAssignmentId`, not teacher/tenant identity fields, and derive term, teacher, classroom, and subject from the scoped assignment. Attendance and score mutations require a classroom context and compare it with the canonical session/assessment before writing.
 
 Cookie-authenticated mutations require an exact same-origin `Origin`, `application/json`, and a body at or below 64 KiB. Deployments behind a proxy must preserve the public request origin correctly.
+
+## Admin console contracts
+
+Staff directory responses include teacher-profile status and teaching-assignment count. Assignment responses include the classroom, subject, term, and academic-year labels needed to display each authorization scope independently. The temporary password is accepted only by staff creation and is never included in a response.
+
+Owner and admin users may list and mutate classrooms, subjects, years, and terms within their school. Admin users cannot create or modify `SCHOOL_OWNER` accounts; teachers receive `403` from admin collection APIs. Request fields such as `schoolId`, `actorUserId`, `teacherId`, and caller role remain non-authoritative and are replaced by the resolved session context.
+
+Creating or marking an academic year current clears the prior current year and any current term from another year. Creating or marking a term current clears the prior current term and marks its parent year current. Start dates must precede end dates, and term dates must fit inside the parent academic year.

@@ -79,6 +79,8 @@ export interface StaffUserResult {
   status: AccountStatus;
   teacherId: string | null;
   employeeCode: string | null;
+  teacherIsActive: boolean | null;
+  assignmentCount: number;
   lastLoginAt: string | null;
   createdAt: string;
 }
@@ -101,7 +103,57 @@ export interface TeachingAssignmentResult {
   termId: string;
   classroomId: string;
   subjectId: string;
+  teacherName: string;
+  classroomName: string;
+  subjectCode: string;
+  subjectName: string;
+  termName: string;
+  academicYearName: string;
   createdAt: string;
+}
+
+export interface CreateSubjectInput extends TenantServiceInput {
+  code: string;
+  name: string;
+  isActive?: boolean;
+}
+
+export interface UpdateSubjectInput extends TenantServiceInput {
+  subjectId: string;
+  code?: string;
+  name?: string;
+  isActive?: boolean;
+}
+
+export interface CreateAcademicYearInput extends TenantServiceInput {
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  isCurrent?: boolean;
+}
+
+export interface UpdateAcademicYearInput extends TenantServiceInput {
+  academicYearId: string;
+  name?: string;
+  startsOn?: string;
+  endsOn?: string;
+  isCurrent?: boolean;
+}
+
+export interface CreateTermInput extends TenantServiceInput {
+  academicYearId: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  isCurrent?: boolean;
+}
+
+export interface UpdateTermInput extends TenantServiceInput {
+  termId: string;
+  name?: string;
+  startsOn?: string;
+  endsOn?: string;
+  isCurrent?: boolean;
 }
 
 export const SESSION_STATUSES = [
@@ -172,6 +224,7 @@ export interface CreateClassroomInput extends TenantServiceInput {
 
 export interface UpdateClassroomInput extends TenantServiceInput {
   classroomId: string;
+  code?: string;
   name?: string;
   gradeLevel?: string;
   homeroomTeacherId?: string | null;
@@ -272,6 +325,43 @@ export interface ClassroomResult {
   gradeLevel: string;
   homeroomTeacherId: string | null;
   isActive: boolean;
+  studentCount?: number;
+  teachingAssignmentCount?: number;
+}
+
+export interface SubjectResult {
+  id: string;
+  schoolId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AcademicYearResult {
+  id: string;
+  schoolId: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  isCurrent: boolean;
+  termCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TermResult {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  academicYearName: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TimetableEntryResult {

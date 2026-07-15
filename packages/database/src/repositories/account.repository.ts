@@ -15,7 +15,16 @@ export function listStaffUsersForSchool(client: AccountClient, scope: TenantScop
   const schoolId = requireSchoolId(scope);
   return client.user.findMany({
     where: { schoolId },
-    include: { teacherProfile: { select: { id: true, employeeCode: true } } },
+    include: {
+      teacherProfile: {
+        select: {
+          id: true,
+          employeeCode: true,
+          isActive: true,
+          _count: { select: { teachingAssignments: true } },
+        },
+      },
+    },
     orderBy: [{ role: "asc" }, { lastName: "asc" }, { firstName: "asc" }],
   });
 }
@@ -28,7 +37,11 @@ export async function requireStaffUserForSchool(
   const userId = requireRecordId(input.userId, "userId");
   const user = await client.user.findUnique({
     where: { id: userId, schoolId },
-    include: { teacherProfile: true },
+    include: {
+      teacherProfile: {
+        include: { _count: { select: { teachingAssignments: true } } },
+      },
+    },
   });
   if (!user) throw new TenantRecordNotFoundError("Staff user");
   return user;
@@ -55,7 +68,16 @@ export function createStaffUserForSchool(
       status: "ACTIVE",
       passwordHash: input.passwordHash,
     },
-    include: { teacherProfile: { select: { id: true, employeeCode: true } } },
+    include: {
+      teacherProfile: {
+        select: {
+          id: true,
+          employeeCode: true,
+          isActive: true,
+          _count: { select: { teachingAssignments: true } },
+        },
+      },
+    },
   });
 }
 
@@ -68,7 +90,16 @@ export async function setStaffStatusForSchool(
   const user = await client.user.update({
     where: { id: userId, schoolId },
     data: { status: input.status },
-    include: { teacherProfile: { select: { id: true, employeeCode: true } } },
+    include: {
+      teacherProfile: {
+        select: {
+          id: true,
+          employeeCode: true,
+          isActive: true,
+          _count: { select: { teachingAssignments: true } },
+        },
+      },
+    },
   });
   if (input.status === "DISABLED") {
     await client.authSession.updateMany({
@@ -125,7 +156,14 @@ export function createTeachingAssignmentForSchool(
       classroomId: input.classroomId,
       subjectId: input.subjectId,
     },
-    include: { teacher: { select: { userId: true } } },
+    include: {
+      teacher: { select: { userId: true, firstName: true, lastName: true } },
+      classroom: { select: { name: true } },
+      subject: { select: { code: true, name: true } },
+      term: {
+        select: { name: true, academicYear: { select: { name: true } } },
+      },
+    },
   });
 }
 
@@ -139,8 +177,19 @@ export function listTeachingAssignmentsForSchool(
       schoolId,
       ...(input.userId ? { teacher: { userId: input.userId } } : {}),
     },
-    include: { teacher: { select: { userId: true } } },
-    orderBy: [{ termId: "asc" }, { classroomId: "asc" }, { subjectId: "asc" }],
+    include: {
+      teacher: { select: { userId: true, firstName: true, lastName: true } },
+      classroom: { select: { name: true } },
+      subject: { select: { code: true, name: true } },
+      term: {
+        select: { name: true, academicYear: { select: { name: true } } },
+      },
+    },
+    orderBy: [
+      { term: { startsOn: "desc" } },
+      { classroom: { name: "asc" } },
+      { subject: { name: "asc" } },
+    ],
   });
 }
 
@@ -152,7 +201,14 @@ export async function requireTeachingAssignmentForSchool(
   const id = requireRecordId(input.teachingAssignmentId, "teachingAssignmentId");
   const assignment = await client.teachingAssignment.findUnique({
     where: { id, schoolId },
-    include: { teacher: { select: { userId: true } } },
+    include: {
+      teacher: { select: { userId: true, firstName: true, lastName: true } },
+      classroom: { select: { name: true } },
+      subject: { select: { code: true, name: true } },
+      term: {
+        select: { name: true, academicYear: { select: { name: true } } },
+      },
+    },
   });
   if (!assignment) throw new TenantRecordNotFoundError("Teaching assignment");
   return assignment;

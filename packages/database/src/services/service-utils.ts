@@ -60,7 +60,11 @@ export function toStudentResult(student: Student): StudentResult {
   };
 }
 
-export function toClassroomResult(classroom: Classroom): ClassroomResult {
+export function toClassroomResult(
+  classroom: Classroom & {
+    _count?: { classEnrollments: number; teachingAssignments: number };
+  },
+): ClassroomResult {
   return {
     id: classroom.id,
     schoolId: classroom.schoolId,
@@ -69,6 +73,12 @@ export function toClassroomResult(classroom: Classroom): ClassroomResult {
     gradeLevel: classroom.gradeLevel,
     homeroomTeacherId: classroom.homeroomTeacherId,
     isActive: classroom.isActive,
+    ...(classroom._count
+      ? {
+          studentCount: classroom._count.classEnrollments,
+          teachingAssignmentCount: classroom._count.teachingAssignments,
+        }
+      : {}),
   };
 }
 

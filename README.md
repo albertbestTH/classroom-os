@@ -75,3 +75,13 @@ Successful responses use `{ "data": ... }`; errors use `{ "error": { "code", "me
 Login attempts are limited by a one-way hash of normalized email plus client IP. Defaults are five attempts per fifteen minutes with at most 10,000 in-memory buckets; configure them with `AUTH_LOGIN_RATE_LIMIT_MAX`, `AUTH_LOGIN_RATE_LIMIT_WINDOW_MS`, and `AUTH_LOGIN_RATE_LIMIT_MAX_BUCKETS`. The current implementation is appropriate for one application instance; multi-instance deployment requires Redis or another shared atomic store.
 
 Owner/admin account services can list and create staff, enable or disable accounts, assign teacher profiles, and create multiple term/classroom/subject teaching assignments. Admins cannot create or modify owners. Disabling an account revokes all active sessions in the same transaction. Temporary passwords are explicit inputs, hashed immediately, and excluded from audit metadata.
+
+## Admin console
+
+Authenticated owner/admin screens are available at `/staff`, `/classrooms`, `/subjects`, `/academic-years`, and `/terms`. Initial lists are rendered on the server; focused client components handle filters, forms, confirmation dialogs, and refreshes through the authenticated API. Teachers are redirected away from admin-only pages and see a read-only `/classrooms` view limited to their assignments.
+
+Navigation is derived from the trusted session role. Owners see school settings, admins see management sections without owner settings, and teachers see only dashboard, assigned classes, timetable, attendance, and gradebook links. Rendering a hidden link is never treated as authorization: every protected page and API handler revalidates role and tenant scope.
+
+Staff accounts are created with a one-time temporary password input that follows the existing password policy. The password is never returned or audited. Disabling an account requires an in-app confirmation and revokes active sessions transactionally. Teacher profiles and teaching assignments remain separate steps so one teacher can hold multiple classroom/subject assignments in the same term without merging classroom data.
+
+Subject, classroom, academic-year, and term mutations are tenant-scoped and audited. PostgreSQL partial unique indexes enforce at most one current academic year and one current term per school; service transactions also clear the previous current selection and keep a current term's academic year current.

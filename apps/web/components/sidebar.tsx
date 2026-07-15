@@ -5,13 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { logoutAction } from "@/app/login/actions";
-
-const navigationItems = [
-  { label: "ภาพรวม", shortLabel: "ภาพรวม", href: "/" },
-  { label: "นักเรียน", shortLabel: "นักเรียน", href: "/students" },
-  { label: "ตารางสอน", shortLabel: "ตารางสอน", href: "/timetable" },
-  { label: "สมุดคะแนน", shortLabel: "คะแนน", href: "/gradebook" },
-] as const;
+import { navigationForRole } from "@/lib/navigation";
 
 const roleLabels: Record<CurrentUserResult["role"], string> = {
   SCHOOL_OWNER: "เจ้าของโรงเรียน",
@@ -42,6 +36,7 @@ function AccountSummary({ user }: { user: CurrentUserResult }) {
 
 export function Sidebar({ currentUser }: { currentUser: CurrentUserResult }) {
   const pathname = usePathname();
+  const navigationItems = navigationForRole(currentUser.role);
 
   return (
     <>

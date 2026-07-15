@@ -154,8 +154,13 @@ PostgreSQL uniqueness constraints remain the final authority for exact duplicate
 - At most one scheduled occurrence for a classroom or teacher at the same term, weekday, and start time.
 - Timestamps on all core entities, with automatic `updatedAt` maintenance.
 - Tenant/entity/time indexes for audit history queries.
+- PostgreSQL partial unique indexes allowing one `AcademicYear.isCurrent` and one `Term.isCurrent` row per school.
 
 Rules such as `startTime < endTime`, valid weekday range, interval-overlap prevention, non-negative scores, and score values not exceeding an assessment's maximum are enforced by the application services. They may later be reinforced with reviewed PostgreSQL check constraints or exclusion constraints. The service must also maintain at most one current academic year and term per school, and normalize case for email and business-code uniqueness.
+
+The current-period invariant is now also protected by the `enforce_current_academic_periods` migration. Service transactions unset the previous selection before setting a new current year or term, while partial unique indexes close the concurrent-writer gap. A current term always causes its parent academic year to become current; switching to another year clears a current term belonging to the former year.
+
+Teaching-assignment administration intentionally treats `(termId, teacherId, classroomId, subjectId)` as the complete scope. A teacher can teach the same subject in multiple classrooms and can teach multiple subjects in one classroom. Admin screens display all four dimensions, so classroom A and classroom B are never visually or logically merged.
 
 ## Runtime verification
 

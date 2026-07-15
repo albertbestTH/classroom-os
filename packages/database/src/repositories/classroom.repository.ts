@@ -31,7 +31,7 @@ export type UpdateClassroomInput = TenantScope & {
   classroomId: string;
   data: Pick<
     Prisma.ClassroomUncheckedUpdateInput,
-    "name" | "gradeLevel" | "homeroomTeacherId" | "isActive"
+    "code" | "name" | "gradeLevel" | "homeroomTeacherId" | "isActive"
   >;
 };
 
@@ -72,6 +72,14 @@ export async function listClassroomsForSchool(
         : {}),
     },
     orderBy: [{ gradeLevel: "asc" }, { name: "asc" }, { id: "asc" }],
+    include: {
+      _count: {
+        select: {
+          classEnrollments: { where: { isActive: true } },
+          teachingAssignments: true,
+        },
+      },
+    },
     take,
   });
 }

@@ -95,12 +95,27 @@ describe("staff account management", () => {
         subjectId: tenant.subject.id,
       },
     });
+    await expect(
+      assignTeacherToClass({
+        auth,
+        assignment: {
+          userId: teacher.id,
+          termId: tenant.term.id,
+          classroomId: tenant.classroom.id,
+          subjectId: tenant.subject.id,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
 
     const assignments = await listTeachingAssignments({ auth, userId: teacher.id });
+    const directory = await listStaffUsers({ auth });
     expect(profile.userId).toBe(teacher.id);
+    expect(directory.find(({ id }) => id === teacher.id)?.assignmentCount).toBe(2);
     expect(assignments.map(({ classroomId }) => classroomId)).toEqual(
       expect.arrayContaining([tenant.classroom.id, classroomB.id]),
     );
+    expect(new Set(assignments.map(({ classroomName }) => classroomName)).size).toBe(2);
+    expect(new Set(assignments.map(({ subjectId }) => subjectId)).size).toBe(1);
     const auditText = JSON.stringify(
       await prisma.auditLog.findMany({ where: { schoolId: tenant.school.id } }),
     );
@@ -143,6 +158,23 @@ describe("staff account management", () => {
         },
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects invalid staff account input without persisting credentials", async () => {
+    const { auth } = await createManager("SCHOOL_OWNER");
+    await expect(
+      createStaffAccount({
+        auth,
+        account: {
+          email: "not-an-email",
+          firstName: "",
+          lastName: "Synthetic",
+          role: "TEACHER",
+          temporaryPassword: "weak",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(prisma.user.count({ where: { email: "not-an-email" } })).resolves.toBe(0);
   });
 
   it("revokes active sessions when an account is disabled and audits the change", async () => {

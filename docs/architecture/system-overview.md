@@ -64,4 +64,14 @@ The login limiter is a lazy per-process map keyed by a SHA-256 digest of normali
 
 Account management remains an application-service concern. Owner/admin services call tenant-scoped repositories, enforce the owner-only boundary, hash explicit temporary passwords, revoke sessions when disabling an account, and audit safe identifiers/status/role changes. Teacher profiles and assignments are linked through authoritative school-owned records.
 
+## Admin console boundary
+
+The web admin console uses server components for authenticated initial reads and small client islands for search, filters, forms, status confirmation, and assignment selection. The `(admin)` route group revalidates an owner/admin session before rendering `/staff`, `/subjects`, `/academic-years`, or `/terms`; `/classrooms` branches by trusted role so managers receive mutation controls while teachers receive only their assignment-scoped class list.
+
+Sidebar items come from a pure role-to-navigation mapping. This improves discoverability but is not a security boundary. Page render functions and route handlers independently enforce roles, tenant scope, and exact teaching assignments.
+
+`subject.service` and `academic-calendar.service` extend the application boundary. Their repositories contain every Prisma query and always qualify records by `schoolId`. Mutations write sanitized audit records in the same transaction. Current academic periods are switched transactionally and backed by PostgreSQL partial unique indexes to prevent concurrent writers from creating multiple current years or terms.
+
+Assignment results include display-safe teacher, classroom, subject, term, and academic-year labels. These labels preserve the complete assignment identity in the UI: the same subject taught in classrooms A and B appears as two rows and never becomes a combined class scope.
+
 GitHub Actions validates this boundary against an ephemeral PostgreSQL 16 service. CI applies the committed migration history with `prisma migrate deploy`; it never creates development migrations or persists the service volume.
