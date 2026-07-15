@@ -85,6 +85,14 @@ Service-layer rules are mandatory:
 
 The initial Prisma schema uses direct foreign keys plus tenant-scoped unique constraints. It does not yet enable PostgreSQL row-level security or composite tenant foreign keys. Those controls should be evaluated before production data is onboarded.
 
+### Runtime tenant enforcement
+
+Database repositories require `schoolId` as an explicit argument. They never expose unscoped list, find, update, or delete operations. Scoped lookups deliberately return the same `TenantRecordNotFoundError` for missing and cross-tenant IDs so callers cannot probe another school's records.
+
+Creating a session from a timetable entry runs in a transaction. The repository finds the timetable entry within the requested school, verifies its term, teacher, classroom, and subject belong to that school, then copies those authoritative IDs into the session. Arbitrary relationship reassignment is not exposed.
+
+These helpers reduce accidental leakage but do not replace authorization, composite tenant foreign keys, or future PostgreSQL row-level security.
+
 ## Operational lifecycle
 
 ```mermaid
@@ -105,6 +113,7 @@ flowchart LR
 ## Enforced invariants
 
 - UUID primary keys on every model.
+- PostgreSQL-native `gen_random_uuid()` defaults for every primary key.
 - Tenant-scoped student, employee, classroom, subject, and user identifiers.
 - At most one enrollment for a student in the same classroom and term.
 - At most one attendance record for a student in a class session.
@@ -113,6 +122,10 @@ flowchart LR
 - Timestamps on all core entities, with automatic `updatedAt` maintenance.
 
 Rules such as `startTime < endTime`, valid weekday range, interval-overlap prevention, date ordering, non-negative scores, and score values not exceeding an assessment's maximum require service validation and may later be reinforced with reviewed PostgreSQL check constraints, exclusion constraints, or triggers in the first migration. The service must also maintain at most one current academic year and term per school, and normalize case for email and business-code uniqueness.
+
+## Runtime verification
+
+Vitest integration tests run against the disposable local PostgreSQL database. They create unique synthetic tenants, verify tenant-scoped repositories and database uniqueness constraints, and remove their own records in dependency order. A safety guard refuses non-local hosts and database names other than `classroom_os`.
 
 ## Explicitly excluded
 

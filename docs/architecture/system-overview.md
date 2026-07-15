@@ -18,15 +18,21 @@ Classroom OS is a pnpm workspace orchestrated with Turborepo.
 
 ```text
 packages/database/
+├── prisma/migrations/
 ├── prisma/schema.prisma
+├── src/repositories/
 ├── src/client.ts
+├── src/tenant.ts
 ├── src/index.ts
+├── tests/integration/
 ├── prisma.config.ts
 ├── tsconfig.json
 └── .env.example
 ```
 
 Prisma targets PostgreSQL and generates a TypeScript client into `packages/database/src/generated/prisma`. Generated code, build output, and local database credentials are excluded from Git. Runtime code creates the PostgreSQL driver adapter lazily so importing the package does not connect to a database or require environment variables during static module evaluation.
+
+The root `docker-compose.yml` provisions the disposable PostgreSQL 16 development service with a persistent named volume and health check. It is local infrastructure only, not a production deployment definition.
 
 The schema is organized around `School` as the tenant boundary. Operational tables carry `schoolId` for explicit service-layer scoping and tenant-first indexes. See [Data Model](./data-model.md) for entity responsibilities and lifecycle details.
 

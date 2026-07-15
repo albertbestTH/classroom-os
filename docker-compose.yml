@@ -1,0 +1,22 @@
+name: classroom-os
+
+services:
+  postgres:
+    image: postgres:16.14-alpine3.24
+    environment:
+      POSTGRES_DB: classroom_os
+      POSTGRES_USER: classroom
+      POSTGRES_PASSWORD: classroom_dev_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - classroom_os_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U classroom -d classroom_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  classroom_os_postgres_data:

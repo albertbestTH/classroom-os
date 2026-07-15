@@ -39,7 +39,7 @@ enum AssessmentType {
 }
 
 model School {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String
   code      String   @unique
   timezone  String   @default("Asia/Bangkok")
@@ -66,7 +66,7 @@ model School {
 }
 
 model AcademicYear {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId  String   @db.Uuid
   name      String
   startsOn  DateTime @db.Date
@@ -84,7 +84,7 @@ model AcademicYear {
 }
 
 model Term {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId       String   @db.Uuid
   academicYearId String   @db.Uuid
   name           String
@@ -108,7 +108,7 @@ model Term {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId  String   @db.Uuid
   email     String
   firstName String
@@ -127,7 +127,7 @@ model User {
 }
 
 model Teacher {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId     String   @db.Uuid
   userId       String?  @unique @db.Uuid
   employeeCode String
@@ -151,7 +151,7 @@ model Teacher {
 }
 
 model Student {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId      String    @db.Uuid
   studentNumber String
   firstName     String
@@ -173,7 +173,7 @@ model Student {
 }
 
 model Classroom {
-  id                String   @id @default(uuid()) @db.Uuid
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId          String   @db.Uuid
   homeroomTeacherId String?  @db.Uuid
   code              String
@@ -197,7 +197,7 @@ model Classroom {
 }
 
 model Subject {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId  String   @db.Uuid
   code      String
   name      String
@@ -217,7 +217,7 @@ model Subject {
 }
 
 model ClassEnrollment {
-  id          String    @id @default(uuid()) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId    String    @db.Uuid
   termId      String    @db.Uuid
   classroomId String    @db.Uuid
@@ -239,7 +239,7 @@ model ClassEnrollment {
 }
 
 model TeachingAssignment {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId    String   @db.Uuid
   termId      String   @db.Uuid
   teacherId   String   @db.Uuid
@@ -260,7 +260,7 @@ model TeachingAssignment {
 }
 
 model TimetableEntry {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId    String   @db.Uuid
   termId      String   @db.Uuid
   teacherId   String   @db.Uuid
@@ -291,7 +291,7 @@ model TimetableEntry {
 }
 
 model ClassSession {
-  id               String        @id @default(uuid()) @db.Uuid
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId         String        @db.Uuid
   termId           String        @db.Uuid
   timetableEntryId String?       @db.Uuid
@@ -323,7 +323,7 @@ model ClassSession {
 }
 
 model AttendanceRecord {
-  id             String           @id @default(uuid()) @db.Uuid
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId       String           @db.Uuid
   classSessionId String           @db.Uuid
   studentId      String           @db.Uuid
@@ -345,7 +345,7 @@ model AttendanceRecord {
 }
 
 model Assessment {
-  id             String         @id @default(uuid()) @db.Uuid
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId       String         @db.Uuid
   termId         String         @db.Uuid
   classroomId    String         @db.Uuid
@@ -373,7 +373,7 @@ model Assessment {
 }
 
 model Score {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   schoolId     String   @db.Uuid
   assessmentId String   @db.Uuid
   studentId    String   @db.Uuid

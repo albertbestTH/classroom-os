@@ -8,11 +8,16 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
     "db:generate": "pnpm --filter @classroom-os/database db:generate",
     "db:format": "pnpm --filter @classroom-os/database db:format",
     "db:validate": "pnpm --filter @classroom-os/database db:validate",
     "db:migrate": "pnpm --filter @classroom-os/database db:migrate",
-    "db:studio": "pnpm --filter @classroom-os/database db:studio"
+    "db:migrate:status": "pnpm --filter @classroom-os/database db:migrate:status",
+    "db:studio": "pnpm --filter @classroom-os/database db:studio",
+    "db:test": "pnpm --filter @classroom-os/database db:test"
   },
   "devDependencies": {
     "turbo": "^2.3.0",
