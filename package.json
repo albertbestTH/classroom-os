@@ -16,6 +16,7 @@
     "db:validate": "pnpm --filter @classroom-os/database db:validate",
     "db:migrate": "pnpm --filter @classroom-os/database db:migrate",
     "db:migrate:status": "pnpm --filter @classroom-os/database db:migrate:status",
+    "db:bootstrap:auth": "pnpm --filter @classroom-os/database db:bootstrap:auth",
     "db:studio": "pnpm --filter @classroom-os/database db:studio",
     "db:test": "pnpm --filter @classroom-os/database db:test"
   },

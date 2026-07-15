@@ -23,11 +23,13 @@
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:status": "prisma migrate status",
+    "db:bootstrap:auth": "tsx scripts/bootstrap-auth.ts",
     "db:studio": "prisma studio",
     "db:test": "pnpm --filter @classroom-os/types build && vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@classroom-os/types": "workspace:*",
+    "@node-rs/argon2": "2.0.2",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
     "pg": "8.22.0",
@@ -38,6 +40,7 @@
     "@types/pg": "8.20.0",
     "dotenv": "17.4.2",
     "prisma": "7.8.0",
+    "tsx": "4.20.6",
     "typescript": "^5.7.0",
     "vitest": "4.1.10"
   }

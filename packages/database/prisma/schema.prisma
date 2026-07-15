@@ -11,8 +11,20 @@ datasource db {
 }
 
 enum UserRole {
-  school_admin
-  teacher
+  SCHOOL_OWNER
+  ADMIN        @map("school_admin")
+  TEACHER      @map("teacher")
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AuthenticationEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
 }
 
 enum SessionStatus {
@@ -47,21 +59,23 @@ model School {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  academicYears       AcademicYear[]
-  terms               Term[]
-  users               User[]
-  teachers            Teacher[]
-  students            Student[]
-  classrooms          Classroom[]
-  subjects            Subject[]
-  classEnrollments    ClassEnrollment[]
-  teachingAssignments TeachingAssignment[]
-  timetableEntries    TimetableEntry[]
-  classSessions       ClassSession[]
-  attendanceRecords   AttendanceRecord[]
-  assessments         Assessment[]
-  scores              Score[]
-  auditLogs           AuditLog[]
+  academicYears        AcademicYear[]
+  terms                Term[]
+  users                User[]
+  teachers             Teacher[]
+  students             Student[]
+  classrooms           Classroom[]
+  subjects             Subject[]
+  classEnrollments     ClassEnrollment[]
+  teachingAssignments  TeachingAssignment[]
+  timetableEntries     TimetableEntry[]
+  classSessions        ClassSession[]
+  attendanceRecords    AttendanceRecord[]
+  assessments          Assessment[]
+  scores               Score[]
+  auditLogs            AuditLog[]
+  authSessions         AuthSession[]
+  authenticationEvents AuthenticationEvent[]
 
   @@index([isActive])
 }
@@ -109,23 +123,60 @@ model Term {
 }
 
 model User {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId  String   @db.Uuid
-  email     String
-  firstName String
-  lastName  String
-  role      UserRole
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId     String        @db.Uuid
+  email        String        @unique
+  firstName    String
+  lastName     String
+  role         UserRole
+  status       AccountStatus @default(ACTIVE)
+  passwordHash String?
+  lastLoginAt  DateTime?     @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
 
-  school                    School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  teacherProfile            Teacher?           @relation("TeacherUser")
-  recordedAttendanceRecords AttendanceRecord[] @relation("AttendanceRecorder")
-  auditLogs                 AuditLog[]         @relation("AuditActor")
+  school                    School                @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  teacherProfile            Teacher?              @relation("TeacherUser")
+  recordedAttendanceRecords AttendanceRecord[]    @relation("AttendanceRecorder")
+  auditLogs                 AuditLog[]            @relation("AuditActor")
+  authSessions              AuthSession[]
+  authenticationEvents      AuthenticationEvent[]
 
-  @@unique([schoolId, email])
-  @@index([schoolId, role, isActive])
+  @@index([schoolId, role, status])
+}
+
+model AuthSession {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId   String    @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, expiresAt])
+  @@index([expiresAt, revokedAt])
+}
+
+model AuthenticationEvent {
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId      String?                 @db.Uuid
+  userId        String?                 @db.Uuid
+  type          AuthenticationEventType
+  principalHash String?                 @db.Char(64)
+  reason        String?
+  createdAt     DateTime                @default(now()) @db.Timestamptz(3)
+
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([userId, createdAt])
+  @@index([principalHash, createdAt])
 }
 
 model Teacher {

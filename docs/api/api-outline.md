@@ -2,6 +2,20 @@
 
 HTTP routes are not implemented yet. This document records the transport-neutral service boundary that future authenticated routes will call.
 
+The Next.js web shell and login server action are implemented, but there is intentionally no general HTTP API surface yet.
+
+## Trusted authentication context
+
+Server code resolves the HttpOnly session cookie into `TrustedAuthContext` containing `userId`, `schoolId`, `role`, and nullable `teacherId`. `schoolId` and `actorUserId` must never be accepted from a request body, query, or client header. Before calling a mutation service, the server constructs tenant input from the trusted context.
+
+Authorization helpers are `requireAuthenticatedUser`, `requireRole`, `requireSchoolAccess`, `requireTeacherProfile`, `requireTeachingAssignment`, `requireClassSessionAccess`, `requireAttendanceAccess`, and `requireAssessmentAccess`/`requireScoreAccess`. Teacher checks always include the exact term, classroom, and subject; assignment to one classroom never grants access to another classroom using the same subject.
+
+| Role | School-wide access | Academic access | Assignment requirement |
+| --- | --- | --- | --- |
+| `SCHOOL_OWNER` | Settings and all user roles | Full within own school | No |
+| `ADMIN` | Users except owner-only operations | Full within own school | No |
+| `TEACHER` | None | Assigned classrooms, subjects, sessions, attendance, and assessments | Exact term + classroom + subject |
+
 ## Service ownership
 
 | Service | Methods |
@@ -13,7 +27,7 @@ HTTP routes are not implemented yet. This document records the transport-neutral
 | Attendance | `updateAttendanceBatch` |
 | Assessment | `createAssessment`, `updateScoreBatch` |
 
-Every method requires `schoolId`. Mutation inputs may carry a nullable `actorUserId` until authentication supplies trusted actor context. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
+Every method requires `schoolId`. At the server boundary, `trustedTenantInput` derives both `schoolId` and `actorUserId` from the session. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
 
 ## Validation ownership
 
@@ -31,6 +45,8 @@ Zod validates request shape, UUIDs, non-empty names, weekday range, time orderin
 
 Messages and details are safe for clients and do not include SQL, connection strings, Prisma internals, or cross-tenant existence information.
 
+Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTIALS` to a generic 401 login response, `ACCOUNT_DISABLED` to a generic 403 login response, and `FORBIDDEN` to 403. Login UI deliberately uses the same client-facing message for bad credentials and unavailable accounts. Internal database details are never included.
+
 ## Planned HTTP surface
 
 - `POST /sessions/start`
@@ -43,4 +59,4 @@ Messages and details are safe for clients and do not include SQL, connection str
 - `PUT /assessments/:assessmentId/scores`
 - `GET /teachers/me/timetable`
 
-Future routes must derive `schoolId` and `actorUserId` from authenticated server context, call exactly one application service, and map `DomainError.code` without exposing internal errors.
+Future routes must derive `schoolId` and `actorUserId` from authenticated server context, perform the resource-specific authorization check, call exactly one application service, and map stable error codes without exposing internal errors.

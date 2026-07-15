@@ -35,6 +35,8 @@ export async function cleanupSyntheticSchools(
 
   const schoolIdFilter = { in: [...schoolIds] };
 
+  await prisma.authenticationEvent.deleteMany({ where: { schoolId: schoolIdFilter } });
+  await prisma.authSession.deleteMany({ where: { schoolId: schoolIdFilter } });
   await prisma.auditLog.deleteMany({ where: { schoolId: schoolIdFilter } });
   await prisma.score.deleteMany({ where: { schoolId: schoolIdFilter } });
   await prisma.attendanceRecord.deleteMany({ where: { schoolId: schoolIdFilter } });

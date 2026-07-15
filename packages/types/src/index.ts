@@ -1,5 +1,30 @@
-export const USER_ROLES = ["school_admin", "teacher"] as const;
+export const USER_ROLES = ["SCHOOL_OWNER", "ADMIN", "TEACHER"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
+
+export const ACCOUNT_STATUSES = ["ACTIVE", "DISABLED"] as const;
+export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+
+export const AUTH_ERROR_CODES = [
+  "UNAUTHENTICATED",
+  "INVALID_CREDENTIALS",
+  "ACCOUNT_DISABLED",
+  "FORBIDDEN",
+] as const;
+export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
+
+export interface TrustedAuthContext {
+  userId: string;
+  schoolId: string;
+  role: UserRole;
+  teacherId: string | null;
+}
+
+export interface CurrentUserResult extends TrustedAuthContext {
+  email: string;
+  firstName: string;
+  lastName: string;
+  schoolName: string;
+}
 
 export const SESSION_STATUSES = [
   "scheduled",

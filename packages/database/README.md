@@ -2,7 +2,7 @@
 
 `@classroom-os/database` owns the PostgreSQL schema, migrations, generated Prisma Client, tenant-scoped repositories, and database integration tests for Classroom OS.
 
-Only synthetic test data is used. The package contains no production connection configuration, permanent seed data, authentication implementation, or biometric models.
+Only synthetic test data is used. The package contains no production connection configuration, permanent seed data, social authentication, password-reset flow, or biometric models.
 
 ## Structure
 
@@ -60,6 +60,7 @@ Never commit `.env` or a real credential. Runtime errors and test output must no
 | `pnpm db:generate` | Regenerate the ignored TypeScript Prisma Client. |
 | `pnpm db:migrate -- --name <name>` | Create and apply a development migration. |
 | `pnpm db:migrate:status` | Compare local migration history with the database. |
+| `pnpm db:bootstrap:auth` | Explicitly create local-only synthetic auth and multi-class fixtures. |
 | `pnpm db:studio` | Open Prisma Studio against the configured local database. |
 | `pnpm db:test` | Run synthetic integration tests against local PostgreSQL. |
 
@@ -75,6 +76,8 @@ Never commit `.env` or a real credential. Runtime errors and test output must no
 The initial migration is `init_classroom_core`. Its SQL uses PostgreSQL-native `gen_random_uuid()` defaults and preserves the unique constraints for enrollment, attendance, and scores.
 
 The second migration is `add_audit_log`. It adds the tenant-scoped audit table, optional actor foreign key, JSON metadata, and indexes for tenant/time and entity-history queries.
+
+`add_authentication_foundation` adds account status, password hash and last-login fields, the owner role, revocable `AuthSession` rows, and sanitized `AuthenticationEvent` rows. Its data migration converts legacy inactive users to `DISABLED` before removing the old boolean. It also makes staff email globally unique for deterministic email/password login.
 
 Do not rewrite a migration after it is shared or applied outside a disposable environment. Create a follow-up migration instead.
 
@@ -106,6 +109,22 @@ Services enforce session transitions, completed-session immutability, active enr
 
 Audit metadata is deliberately narrow. Never place passwords, secrets, tokens, full request bodies, biometric data, or production credentials in `metadata`.
 
+## Authentication and authorization
+
+Passwords are hashed with Argon2id using the package's centralized policy. Password creation requires 12-128 characters, upper/lowercase letters, a number, a symbol, and rejection of common weak fragments. Plaintext passwords exist only for the duration of verification/hashing and are never logged or persisted.
+
+`authenticateWithPassword` returns a server-only opaque token. The database stores only a SHA-256 token hash in `AuthSession`; `resolveServerSession` returns safe user data and trusted `{ userId, schoolId, role, teacherId }` context. `revokeServerSession` performs logout. Do not serialize these internal session results or import the database package into client components.
+
+`SCHOOL_OWNER` and `ADMIN` bypass teaching-assignment checks only after exact school access is established. `TEACHER` access requires an active linked teacher profile and a matching `TeachingAssignment` for the term, classroom, and (when relevant) subject. Resource helpers load sessions/assessments inside the authenticated school before checking assignment, so missing and cross-school IDs do not disclose existence.
+
+For local UI work only:
+
+```powershell
+pnpm db:bootstrap:auth
+```
+
+The script is idempotent, refuses `NODE_ENV=production`, refuses non-local hosts or databases other than `classroom_os`, and creates synthetic class A/B assignments plus an unassigned class C. Accounts are `owner@synthetic.classroom.test`, `admin@synthetic.classroom.test`, and `teacher@synthetic.classroom.test`; the synthetic-only password is `Classroom!Demo2026`. It never runs automatically in application startup or CI.
+
 ## Integration tests
 
 Run:
@@ -118,7 +137,7 @@ pnpm db:test
 
 The safety guard refuses non-local hosts and any database name other than `classroom_os`. Factories create obviously synthetic schools, users, teachers, and students with unique identifiers. Every test deletes its own records in foreign-key-safe order; it never truncates unrelated data or relies on row order.
 
-The suite verifies schema validation, tenant isolation, enrollment/attendance/score uniqueness, timetable-to-session materialization, session transitions, enrollment and score rules, teacher/classroom overlap detection, stable error codes, and audit creation.
+The suite verifies schema validation, tenant isolation, enrollment/attendance/score uniqueness, timetable-to-session materialization, session transitions, enrollment and score rules, teacher/classroom overlap detection, password hashing, disabled and invalid login behavior, revocable session context, multi-class assignment isolation, stable error codes, and audit creation.
 
 ## CI database lifecycle
 
@@ -141,4 +160,4 @@ Volume removal is deliberately not part of any package script.
 - No real student data or permanent seed records.
 - No biometric or face-recognition data.
 - No parent or student application models.
-- No authentication implementation; `User` is persistence groundwork for later RBAC.
+- No social login, password reset, parent/student identity, or biometric authentication.

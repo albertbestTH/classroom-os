@@ -9,7 +9,9 @@ The Sprint 2 schema establishes the PostgreSQL foundation for teacher-led classr
 | `School` | Tenant identity, timezone, and root ownership of all school data. |
 | `AcademicYear` | School-specific academic calendar boundary containing terms. |
 | `Term` | Scheduling, enrollment, teaching, session, and assessment period. |
-| `User` | Future sign-in/RBAC identity for a school administrator or teacher. No authentication logic is included yet. |
+| `User` | School identity with globally normalized email, Argon2id password hash, role, account status, and last-login time. |
+| `AuthSession` | Revocable server-side login session storing only an opaque token hash, expiry, activity, and revocation time. |
+| `AuthenticationEvent` | Minimal success/failure/logout security record with optional tenant/user and a one-way principal hash. |
 | `Teacher` | Staff profile used by assignments, schedules, sessions, assessments, and grading. A profile may optionally link to a `User`. |
 | `Student` | School-owned learner profile identified by a tenant-scoped student number. |
 | `Classroom` | Stable class or homeroom grouping with an optional homeroom teacher. |
@@ -29,6 +31,10 @@ The Sprint 2 schema establishes the PostgreSQL foundation for teacher-led classr
 erDiagram
     School ||--o{ AcademicYear : owns
     School ||--o{ User : owns
+    School o|--o{ AuthSession : scopes
+    User ||--o{ AuthSession : authenticates
+    School o|--o{ AuthenticationEvent : scopes
+    User o|--o{ AuthenticationEvent : records
     School ||--o{ Teacher : owns
     School ||--o{ Student : owns
     School ||--o{ Classroom : owns
@@ -96,7 +102,17 @@ Creating a session from a timetable entry runs in a transaction. The repository 
 
 These helpers reduce accidental leakage but do not replace authorization, composite tenant foreign keys, or future PostgreSQL row-level security.
 
-Application services are the supported business boundary. Each method requires `schoolId`, validates input before persistence, uses scoped repositories, and maps expected errors to stable transport-neutral codes. Cross-tenant and missing lookups use non-disclosing not-found behavior. Authentication will eventually provide trusted tenant and actor context; it is not implemented in this sprint.
+Application services are the supported business boundary. Each method requires `schoolId`, validates input before persistence, uses scoped repositories, and maps expected errors to stable transport-neutral codes. Cross-tenant and missing lookups use non-disclosing behavior. Authentication resolves a server-side session into trusted tenant and actor context; routes must replace, not merge from, any request-body scope.
+
+## Authentication lifecycle and authorization
+
+1. Login normalizes the email and verifies the stored hash with Argon2id. Unknown accounts still execute a dummy password verification to reduce timing disclosure.
+2. Active credentials create a random 256-bit token. The browser receives it in an HttpOnly cookie, while PostgreSQL stores only its SHA-256 hash and expiry.
+3. Each protected server render/action hashes the cookie, loads an unrevoked, unexpired session, and checks `User.status`, `School.isActive`, and the linked teacher status.
+4. Logout revokes the session row. Successful login, failed login, and logout append sanitized `AuthenticationEvent` rows.
+5. `SCHOOL_OWNER` and `ADMIN` may operate across academic resources within their own school. A `TEACHER` must have a matching `TeachingAssignment` for the exact term, classroom, and subject. The same subject in a different classroom remains a distinct authorization boundary.
+
+Email is globally unique in the current staff-account model so email/password login is deterministic. Each user belongs to exactly one school. A future cross-school identity design would require an explicit organization selector or separate identity/account tables.
 
 ## Operational lifecycle
 
@@ -131,7 +147,7 @@ PostgreSQL uniqueness constraints remain the final authority for exact duplicate
 
 - UUID primary keys on every model.
 - PostgreSQL-native `gen_random_uuid()` defaults for every primary key.
-- Tenant-scoped student, employee, classroom, subject, and user identifiers.
+- Tenant-scoped student, employee, classroom, and subject identifiers; staff email is globally unique for deterministic login.
 - At most one enrollment for a student in the same classroom and term.
 - At most one attendance record for a student in a class session.
 - At most one score for a student on an assessment.
@@ -147,4 +163,4 @@ Vitest integration tests run against the disposable local PostgreSQL database. T
 
 ## Explicitly excluded
 
-This foundation has no biometric or face-recognition tables, no seed or real student data, and no parent/student application models. Authentication implementation and production connection configuration are separate future work.
+This foundation has no biometric or face-recognition tables, no real student data, and no parent/student application models. Social login, password reset, MFA, and production identity-provider configuration remain out of scope.

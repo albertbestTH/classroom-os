@@ -44,7 +44,7 @@ export async function createSyntheticTenant(
       email: `teacher+${token}@example.invalid`,
       firstName: "Synthetic",
       lastName: "Teacher",
-      role: "teacher",
+      role: "TEACHER",
     },
   });
   const teacher = await prisma.teacher.create({
