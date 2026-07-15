@@ -1,1 +1,5 @@
 node_modules
+.turbo
+packages/database/.env
+packages/database/dist
+packages/database/src/generated

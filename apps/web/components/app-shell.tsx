@@ -1,13 +1,20 @@
-﻿import type { ReactNode } from "react";
-import { Sidebar } from "./sidebar";
+import type { ReactNode } from "react";
 
-export function AppShell({ children }: { children: ReactNode }) {
+import { Sidebar } from "@/components/sidebar";
+
+type AppShellProps = {
+  children: ReactNode;
+};
+
+export function AppShell({ children }: AppShellProps) {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <section className="min-w-0 flex-1 px-6 py-8 lg:px-10">{children}</section>
-      </div>
-    </main>
+    <div className="min-h-screen bg-[#F7F8FA] text-[#111827]">
+      <Sidebar />
+      <main className="min-w-0 pb-10 pt-6 lg:ml-64 lg:py-10">
+        <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }

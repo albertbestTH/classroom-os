@@ -7,7 +7,12 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "test": "turbo test"
+    "test": "turbo test",
+    "db:generate": "pnpm --filter @classroom-os/database db:generate",
+    "db:format": "pnpm --filter @classroom-os/database db:format",
+    "db:validate": "pnpm --filter @classroom-os/database db:validate",
+    "db:migrate": "pnpm --filter @classroom-os/database db:migrate",
+    "db:studio": "pnpm --filter @classroom-os/database db:studio"
   },
   "devDependencies": {
     "turbo": "^2.3.0",
