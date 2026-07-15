@@ -4,6 +4,7 @@ export * from "./auth/authentication.service.js";
 export * from "./auth/authorization.js";
 export * from "./auth/password.js";
 export * from "./services/assessment.service.js";
+export * from "./services/account.service.js";
 export * from "./services/attendance.service.js";
 export * from "./services/classroom.service.js";
 export * from "./services/session.service.js";

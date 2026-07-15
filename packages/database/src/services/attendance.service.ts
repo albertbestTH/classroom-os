@@ -9,6 +9,7 @@ import { domainError } from "../domain-errors.js";
 import { createAuditLogForSchool } from "../repositories/audit.repository.js";
 import {
   findUnenrolledStudentIdsForSchool,
+  listAttendanceForSessionForSchool,
   requireAttendanceSessionForSchool,
   upsertAttendanceBatchForSchool,
 } from "../repositories/attendance.repository.js";
@@ -70,5 +71,15 @@ export function updateAttendanceBatch(
       const results = records.map(toAttendanceResult);
       return { count: results.length, records: results };
     });
+  });
+}
+
+export function listAttendanceForSession(input: {
+  schoolId: string;
+  sessionId: string;
+}): Promise<AttendanceRecordResult[]> {
+  return executeTenantService(input, async () => {
+    const records = await listAttendanceForSessionForSchool(getPrismaClient(), input);
+    return records.map(toAttendanceResult);
   });
 }

@@ -22,6 +22,8 @@ export type CreateClassroomInput = TenantScope &
 export type ListClassroomsInput = TenantScope & {
   gradeLevel?: string;
   isActive?: boolean;
+  teacherId?: string;
+  termId?: string;
   take?: number;
 };
 
@@ -57,6 +59,17 @@ export async function listClassroomsForSchool(
       schoolId,
       ...(input.gradeLevel ? { gradeLevel: input.gradeLevel } : {}),
       ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+      ...(input.teacherId
+        ? {
+            teachingAssignments: {
+              some: {
+                schoolId,
+                teacherId: input.teacherId,
+                ...(input.termId ? { termId: input.termId } : {}),
+              },
+            },
+          }
+        : {}),
     },
     orderBy: [{ gradeLevel: "asc" }, { name: "asc" }, { id: "asc" }],
     take,

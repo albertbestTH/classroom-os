@@ -9,6 +9,7 @@ export const AUTH_ERROR_CODES = [
   "INVALID_CREDENTIALS",
   "ACCOUNT_DISABLED",
   "FORBIDDEN",
+  "RATE_LIMITED",
 ] as const;
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
@@ -24,6 +25,83 @@ export interface CurrentUserResult extends TrustedAuthContext {
   firstName: string;
   lastName: string;
   schoolName: string;
+}
+
+export type ApiErrorCode =
+  | AuthErrorCode
+  | DomainErrorCode
+  | "INTERNAL_ERROR";
+
+export interface ApiSuccessResponse<T> {
+  data: T;
+}
+
+export interface ApiErrorResponse {
+  error: {
+    code: ApiErrorCode;
+    message: string;
+    fieldErrors?: Readonly<Record<string, readonly string[]>>;
+  };
+}
+
+export interface CreateStaffAccountInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  temporaryPassword: string;
+}
+
+export interface SetStaffAccountStatusInput {
+  userId: string;
+  status: AccountStatus;
+}
+
+export interface AssignTeacherProfileInput {
+  userId: string;
+  employeeCode: string;
+}
+
+export interface CreateTeachingAssignmentInput {
+  userId: string;
+  termId: string;
+  classroomId: string;
+  subjectId: string;
+}
+
+export interface StaffUserResult {
+  id: string;
+  schoolId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  status: AccountStatus;
+  teacherId: string | null;
+  employeeCode: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface TeacherProfileResult {
+  id: string;
+  schoolId: string;
+  userId: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+}
+
+export interface TeachingAssignmentResult {
+  id: string;
+  schoolId: string;
+  userId: string;
+  teacherId: string;
+  termId: string;
+  classroomId: string;
+  subjectId: string;
+  createdAt: string;
 }
 
 export const SESSION_STATUSES = [

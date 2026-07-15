@@ -164,3 +164,12 @@ export function listTimetableEntries(
     return entries.map(toTimetableEntryResult);
   });
 }
+
+export function getTimetableEntry(
+  input: TenantServiceInput & { timetableEntryId: string },
+): Promise<TimetableEntryResult> {
+  return executeTenantService(input, async () => {
+    const entry = await requireTimetableEntryForSchool(getPrismaClient(), input);
+    return toTimetableEntryResult(entry);
+  });
+}

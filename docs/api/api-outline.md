@@ -1,8 +1,10 @@
 # API Outline
 
-HTTP routes are not implemented yet. This document records the transport-neutral service boundary that future authenticated routes will call.
+Authenticated Next.js App Router handlers are implemented under `/api`. They are server-only adapters over the application service boundary; raw Prisma access is not exported.
 
-The Next.js web shell and login server action are implemented, but there is intentionally no general HTTP API surface yet.
+## Response contract
+
+Success responses are `{ "data": ... }`. Errors are `{ "error": { "code": "...", "message": "...", "fieldErrors": optional } }`. All API responses use `Cache-Control: no-store`. Unknown failures return `INTERNAL_ERROR` with status 500 and a generic message; stack traces and internal database details are never serialized.
 
 ## Trusted authentication context
 
@@ -47,16 +49,20 @@ Messages and details are safe for clients and do not include SQL, connection str
 
 Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTIALS` to a generic 401 login response, `ACCOUNT_DISABLED` to a generic 403 login response, and `FORBIDDEN` to 403. Login UI deliberately uses the same client-facing message for bad credentials and unavailable accounts. Internal database details are never included.
 
-## Planned HTTP surface
+`RATE_LIMITED` maps to 429. Login rate keys combine normalized email and available client IP, then hash the combination before storage. Limits are configured through `AUTH_LOGIN_RATE_LIMIT_MAX`, `AUTH_LOGIN_RATE_LIMIT_WINDOW_MS`, and `AUTH_LOGIN_RATE_LIMIT_MAX_BUCKETS`.
 
-- `POST /sessions/start`
-- `GET /sessions/:id`
-- `POST /sessions/:id/end`
-- `GET /sessions/:id/timeline`
-- `GET /sessions/:id/attendance`
-- `PUT /sessions/:id/attendance`
-- `POST /classes/:classId/assessments`
-- `PUT /assessments/:assessmentId/scores`
-- `GET /teachers/me/timetable`
+## HTTP surface
 
-Future routes must derive `schoolId` and `actorUserId` from authenticated server context, perform the resource-specific authorization check, call exactly one application service, and map stable error codes without exposing internal errors.
+- `GET|POST|DELETE /api/auth/session`
+- `GET|POST /api/students`; `GET|PATCH /api/students/:id`
+- `GET|POST /api/classrooms`; `GET|PATCH /api/classrooms/:id`
+- `GET|POST /api/timetable`; `PATCH /api/timetable/:id`
+- `POST /api/sessions`; `GET /api/sessions/:id`; `POST /start`; `POST /end`
+- `GET|PUT /api/sessions/:id/attendance`
+- `POST /api/assessments`; `PUT /api/assessments/:id/scores`
+- `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
+- `GET|POST /api/staff/:id/teaching-assignments`; `GET /api/teaching-assignments`
+
+Timetable and assessment creation accept a `teachingAssignmentId`, not teacher/tenant identity fields, and derive term, teacher, classroom, and subject from the scoped assignment. Attendance and score mutations require a classroom context and compare it with the canonical session/assessment before writing.
+
+Cookie-authenticated mutations require an exact same-origin `Origin`, `application/json`, and a body at or below 64 KiB. Deployments behind a proxy must preserve the public request origin correctly.

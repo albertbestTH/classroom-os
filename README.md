@@ -64,4 +64,14 @@ The command refuses production and non-local databases. Synthetic logins use `ow
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It provisions an ephemeral PostgreSQL 16 service, installs pnpm through Corepack, restores the pnpm store cache, applies committed migrations with `prisma migrate deploy`, and then runs database tests, lint, and build. CI uses synthetic data and a CI-only database password.
+`.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It provisions an ephemeral PostgreSQL 16 service, installs pnpm through Corepack, restores the pnpm store cache, applies committed migrations with `prisma migrate deploy`, and then runs database tests, authenticated API tests, lint, and build. CI uses synthetic data, a CI-only database password, and safe login-rate defaults.
+
+## Authenticated API foundation
+
+Next.js route handlers under `apps/web/app/api` expose students, classrooms, timetables, sessions, attendance, assessments, scores, staff accounts, and teaching assignments. Every protected handler resolves the opaque session cookie at request time and derives tenant, actor, role, and teacher identity from that trusted record. Request bodies cannot override those identities.
+
+Successful responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "fieldErrors?" } }`. Sensitive responses are `no-store`. Cookie-authenticated mutations require a same-origin `Origin`, valid JSON content type, and bodies no larger than 64 KiB.
+
+Login attempts are limited by a one-way hash of normalized email plus client IP. Defaults are five attempts per fifteen minutes with at most 10,000 in-memory buckets; configure them with `AUTH_LOGIN_RATE_LIMIT_MAX`, `AUTH_LOGIN_RATE_LIMIT_WINDOW_MS`, and `AUTH_LOGIN_RATE_LIMIT_MAX_BUCKETS`. The current implementation is appropriate for one application instance; multi-instance deployment requires Redis or another shared atomic store.
+
+Owner/admin account services can list and create staff, enable or disable accounts, assign teacher profiles, and create multiple term/classroom/subject teaching assignments. Admins cannot create or modify owners. Disabling an account revokes all active sessions in the same transaction. Temporary passwords are explicit inputs, hashed immediately, and excluded from audit metadata.

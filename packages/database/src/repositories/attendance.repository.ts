@@ -107,3 +107,16 @@ export async function upsertAttendanceBatchForSchool(
   }
   return records;
 }
+
+export async function listAttendanceForSessionForSchool(
+  client: AttendanceClient,
+  input: TenantScope & { sessionId: string },
+): Promise<AttendanceRecord[]> {
+  const schoolId = requireSchoolId(input);
+  const classSessionId = requireRecordId(input.sessionId, "sessionId");
+  await requireAttendanceSessionForSchool(client, input);
+  return client.attendanceRecord.findMany({
+    where: { schoolId, classSessionId },
+    orderBy: [{ studentId: "asc" }],
+  });
+}

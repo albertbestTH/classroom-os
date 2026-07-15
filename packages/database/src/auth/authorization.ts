@@ -92,6 +92,75 @@ export async function requireClassSessionAccess(
   await requireTeachingAssignment(authenticated, session);
 }
 
+export async function requireClassroomAccess(
+  context: TrustedAuthContext | null | undefined,
+  requirement: { classroomId: string; termId?: string; subjectId?: string },
+): Promise<void> {
+  const authenticated = requireAuthenticatedUser(context);
+  const prisma = getPrismaClient();
+  const classroom = await prisma.classroom.findFirst({
+    where: { id: requirement.classroomId, schoolId: authenticated.schoolId },
+    select: { id: true },
+  });
+  if (!classroom) throw authError("FORBIDDEN", "The classroom is not accessible.");
+  if (authenticated.role !== "TEACHER") return;
+  const teacher = requireTeacherProfile(authenticated);
+  const assignment = await prisma.teachingAssignment.findFirst({
+    where: {
+      schoolId: authenticated.schoolId,
+      teacherId: teacher.teacherId,
+      classroomId: requirement.classroomId,
+      ...(requirement.termId ? { termId: requirement.termId } : {}),
+      ...(requirement.subjectId ? { subjectId: requirement.subjectId } : {}),
+    },
+    select: { id: true },
+  });
+  if (!assignment) throw authError("FORBIDDEN", "The classroom is not assigned to this teacher.");
+}
+
+export async function requireStudentAccess(
+  context: TrustedAuthContext | null | undefined,
+  studentId: string,
+): Promise<void> {
+  const authenticated = requireAuthenticatedUser(context);
+  const prisma = getPrismaClient();
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, schoolId: authenticated.schoolId },
+    select: {
+      id: true,
+      classEnrollments: {
+        where: { schoolId: authenticated.schoolId, isActive: true },
+        select: { termId: true, classroomId: true },
+      },
+    },
+  });
+  if (!student) throw authError("FORBIDDEN", "The student is not accessible.");
+  if (authenticated.role !== "TEACHER") return;
+  const teacher = requireTeacherProfile(authenticated);
+  const assignment = await prisma.teachingAssignment.findFirst({
+    where: {
+      schoolId: authenticated.schoolId,
+      teacherId: teacher.teacherId,
+      OR: student.classEnrollments.map(({ termId, classroomId }) => ({ termId, classroomId })),
+    },
+    select: { id: true },
+  });
+  if (!assignment) throw authError("FORBIDDEN", "The student is not in an assigned classroom.");
+}
+
+export async function requireTimetableEntryAccess(
+  context: TrustedAuthContext | null | undefined,
+  timetableEntryId: string,
+): Promise<void> {
+  const authenticated = requireAuthenticatedUser(context);
+  const entry = await getPrismaClient().timetableEntry.findFirst({
+    where: { id: timetableEntryId, schoolId: authenticated.schoolId },
+    select: { schoolId: true, termId: true, classroomId: true, subjectId: true },
+  });
+  if (!entry) throw authError("FORBIDDEN", "The timetable entry is not accessible.");
+  await requireTeachingAssignment(authenticated, entry);
+}
+
 export async function requireAttendanceAccess(
   context: TrustedAuthContext | null | undefined,
   requirement: string | { sessionId: string; classroomId: string },

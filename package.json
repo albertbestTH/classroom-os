@@ -18,7 +18,8 @@
     "db:migrate:status": "pnpm --filter @classroom-os/database db:migrate:status",
     "db:bootstrap:auth": "pnpm --filter @classroom-os/database db:bootstrap:auth",
     "db:studio": "pnpm --filter @classroom-os/database db:studio",
-    "db:test": "pnpm --filter @classroom-os/database db:test"
+    "db:test": "pnpm --filter @classroom-os/database db:test",
+    "api:test": "pnpm --filter web test"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

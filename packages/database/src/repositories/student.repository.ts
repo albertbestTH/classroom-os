@@ -27,6 +27,8 @@ export type CreateStudentInput = TenantScope &
 export type ListStudentsInput = TenantScope & {
   query?: string;
   isActive?: boolean;
+  classroomId?: string;
+  termId?: string;
   take?: number;
 };
 
@@ -77,6 +79,18 @@ export async function listStudentsForSchool(
     where: {
       schoolId,
       ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+      ...(input.classroomId
+        ? {
+            classEnrollments: {
+              some: {
+                schoolId,
+                classroomId: input.classroomId,
+                ...(input.termId ? { termId: input.termId } : {}),
+                isActive: true,
+              },
+            },
+          }
+        : {}),
       ...(query
         ? {
             OR: [

@@ -9,7 +9,9 @@ import {
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const AUTH_COOKIE_NAME = "classroom_os_session";
+import { AUTH_COOKIE_NAME, sessionCookieOptions } from "@/lib/auth-cookie";
+
+export { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
 export async function getOptionalWebSession(): Promise<ResolvedSessionResult | null> {
   const cookieStore = await cookies();
@@ -32,13 +34,7 @@ export async function requireWebSession(): Promise<ResolvedSessionResult> {
 
 export async function setWebSessionCookie(token: string, expiresAt: Date): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  cookieStore.set(AUTH_COOKIE_NAME, token, sessionCookieOptions(expiresAt));
 }
 
 export async function clearWebSession(): Promise<void> {

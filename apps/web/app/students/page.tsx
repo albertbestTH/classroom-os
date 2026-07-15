@@ -1,7 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { StudentDirectory } from "@/components/student-directory";
-import { students } from "@/data/mock-data";
 
 export default function StudentsPage() {
   return (
@@ -19,7 +18,7 @@ export default function StudentsPage() {
           </button>
         }
       />
-      <StudentDirectory students={students} />
+      <StudentDirectory />
     </AppShell>
   );
 }

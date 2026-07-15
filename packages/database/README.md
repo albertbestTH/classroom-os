@@ -109,6 +109,10 @@ Services enforce session transitions, completed-session immutability, active enr
 
 Audit metadata is deliberately narrow. Never place passwords, secrets, tokens, full request bodies, biometric data, or production credentials in `metadata`.
 
+Account-management services are the exception to caller-supplied tenant scope: they accept a trusted authentication context and derive `schoolId` and actor internally. `listStaffUsers`, `createStaffAccount`, `setStaffAccountStatus`, `assignTeacherProfile`, `assignTeacherToClass`, and teaching-assignment queries enforce owner/admin/teacher boundaries before tenant-scoped repository work. Disabling an account updates its status and revokes active sessions transactionally.
+
+Temporary passwords are required explicitly when creating staff, checked against the same Argon2id policy, hashed before persistence, and never returned or written to audit metadata. Admins can manage admin/teacher accounts but cannot create or modify an owner; teachers cannot manage staff.
+
 ## Authentication and authorization
 
 Passwords are hashed with Argon2id using the package's centralized policy. Password creation requires 12-128 characters, upper/lowercase letters, a number, a symbol, and rejection of common weak fragments. Plaintext passwords exist only for the duration of verification/hashing and are never logged or persisted.
@@ -138,6 +142,8 @@ pnpm db:test
 The safety guard refuses non-local hosts and any database name other than `classroom_os`. Factories create obviously synthetic schools, users, teachers, and students with unique identifiers. Every test deletes its own records in foreign-key-safe order; it never truncates unrelated data or relies on row order.
 
 The suite verifies schema validation, tenant isolation, enrollment/attendance/score uniqueness, timetable-to-session materialization, session transitions, enrollment and score rules, teacher/classroom overlap detection, password hashing, disabled and invalid login behavior, revocable session context, multi-class assignment isolation, stable error codes, and audit creation.
+
+From the repository root, `pnpm api:test` builds shared packages and runs route-handler tests against the same guarded local PostgreSQL database. Tests cover response/error mapping, unauthenticated access, CSRF-aware origin checks, malformed/oversized JSON, trusted tenant propagation, account roles, session revocation, and multi-class API isolation. CI runs both `pnpm db:test` and `pnpm api:test` on a disposable PostgreSQL service.
 
 ## CI database lifecycle
 

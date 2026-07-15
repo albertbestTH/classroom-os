@@ -1,9 +1,11 @@
 "use server";
 
-import { AuthError, authenticateWithPassword } from "@classroom-os/database";
+import { AuthError } from "@classroom-os/database";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 import { safeCallbackPath, setWebSessionCookie } from "@/lib/auth";
+import { getClientIp, loginWithRateLimit } from "@/lib/login-rate-limit";
 
 export type LoginState = Readonly<{ error: string | null }>;
 
@@ -20,7 +22,11 @@ export async function loginAction(
   }
 
   try {
-    const session = await authenticateWithPassword({ email, password });
+    const requestHeaders = await headers();
+    const session = await loginWithRateLimit(
+      { email, password },
+      getClientIp(requestHeaders),
+    );
     await setWebSessionCookie(session.token, session.expiresAt);
   } catch (error) {
     if (error instanceof AuthError) {

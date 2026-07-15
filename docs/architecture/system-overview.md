@@ -42,6 +42,8 @@ App Router server components and server actions call `@classroom-os/database`; b
 
 The session context is the only trusted source for tenant and actor identity. `trustedTenantInput` replaces any client-provided `schoolId` or `actorUserId` before existing application services are invoked. The raw Prisma client, token hash, session row, password hash, and authentication-event principal hash never cross into client components.
 
+Authenticated route handlers share one adapter that resolves the request cookie, maps stable domain/auth errors, applies `no-store`, and returns a consistent response envelope. Mutation handlers additionally enforce same-origin requests, JSON content type, and a 64 KiB body limit. Each resource handler performs its own role and assignment authorization; proxy middleware is not an authorization dependency.
+
 ## Security and privacy
 
 The production posture requires tenant isolation, RBAC, audit logs, encryption, retention controls, least-privilege database credentials, and reviewed migrations. Current RBAC grants school owners and admins tenant-wide academic access; owner-only user/settings operations must explicitly call `requireRole(context, "SCHOOL_OWNER")`. Teachers must match a term, classroom, and subject teaching assignment. PostgreSQL row-level security should be evaluated as defense in depth before real tenant data is introduced.
@@ -57,5 +59,9 @@ Services own workflow rules and transaction boundaries. Repositories own tenant-
 Mutation transactions also create an `AuditLog` with actor, action, entity, safe metadata, and timestamp. Audit metadata must never contain credentials, tokens, secrets, or biometric data.
 
 Authentication uses a separate, narrowly shaped `AuthenticationEvent` because failed logins may not resolve to a school or user. It records event type, optional user/school, a one-way principal hash, a safe reason code, and time. Successful login, failed login, and logout are covered; passwords, raw email addresses, session tokens, and internal errors are excluded.
+
+The login limiter is a lazy per-process map keyed by a SHA-256 digest of normalized email and client IP. It never stores or logs the password. Its limit and window come from environment values with safe defaults. A distributed deployment must replace this implementation with an atomic shared store such as Redis; forwarded IP headers are trusted only behind a configured proxy.
+
+Account management remains an application-service concern. Owner/admin services call tenant-scoped repositories, enforce the owner-only boundary, hash explicit temporary passwords, revoke sessions when disabling an account, and audit safe identifiers/status/role changes. Teacher profiles and assignments are linked through authoritative school-owned records.
 
 GitHub Actions validates this boundary against an ephemeral PostgreSQL 16 service. CI applies the committed migration history with `prisma migrate deploy`; it never creates development migrations or persists the service volume.

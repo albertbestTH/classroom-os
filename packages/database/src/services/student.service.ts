@@ -86,7 +86,12 @@ export function getStudent(
 }
 
 export function listStudents(
-  input: TenantServiceInput & { query?: string; isActive?: boolean },
+  input: TenantServiceInput & {
+    query?: string;
+    isActive?: boolean;
+    classroomId?: string;
+    termId?: string;
+  },
 ): Promise<StudentResult[]> {
   return executeTenantService(input, async () => {
     const students = await listStudentsForSchool(getPrismaClient(), input);
