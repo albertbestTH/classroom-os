@@ -175,7 +175,9 @@ export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
 export const SESSION_TIMELINE_EVENT_TYPES = [
   "SESSION_STARTED",
   "ATTENDANCE_UPDATED",
+  "ATTENDANCE_CORRECTED",
   "SESSION_ENDED",
+  "SESSION_CANCELLED",
 ] as const;
 export type SessionTimelineEventType =
   (typeof SESSION_TIMELINE_EVENT_TYPES)[number];
@@ -277,11 +279,19 @@ export interface MaterializeClassSessionInput extends TenantServiceInput {
 export interface StartClassSessionInput extends TenantServiceInput {
   sessionId: string;
   startedAt?: string;
+  expectedUpdatedAt?: string;
 }
 
 export interface EndClassSessionInput extends TenantServiceInput {
   sessionId: string;
   endedAt?: string;
+  expectedUpdatedAt?: string;
+}
+
+export interface CancelClassSessionInput extends TenantServiceInput {
+  sessionId: string;
+  reason: string;
+  expectedUpdatedAt?: string;
 }
 
 export interface AttendanceBatchItem {
@@ -293,6 +303,15 @@ export interface AttendanceBatchItem {
 export interface UpdateAttendanceBatchInput extends TenantServiceInput {
   sessionId: string;
   records: AttendanceBatchItem[];
+}
+
+export interface CorrectAttendanceInput extends TenantServiceInput {
+  sessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  note?: string | null;
+  reason: string;
+  expectedRecordUpdatedAt: string;
 }
 
 export interface CreateAssessmentInput extends TenantServiceInput {
@@ -411,7 +430,11 @@ export interface ClassSessionResult {
   scheduledEnd: string;
   startedAt: string | null;
   endedAt: string | null;
+  cancelledAt: string | null;
+  cancelledById: string | null;
+  cancellationReason: string | null;
   status: SessionStatus;
+  updatedAt: string;
   teacherName: string;
   classroomName: string;
   subjectCode: string;
@@ -428,6 +451,22 @@ export interface AttendanceRecordResult {
   status: AttendanceStatus;
   note: string | null;
   recordedAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceCorrectionResult {
+  id: string;
+  attendanceRecordId: string;
+  classSessionId: string;
+  studentId: string;
+  actorUserId: string | null;
+  actorName: string | null;
+  beforeStatus: AttendanceStatus;
+  afterStatus: AttendanceStatus;
+  beforeNote: string | null;
+  afterNote: string | null;
+  reason: string;
+  createdAt: string;
 }
 
 export interface SessionAttendanceStudentResult {
@@ -439,6 +478,8 @@ export interface SessionAttendanceStudentResult {
   status: AttendanceStatus | null;
   note: string | null;
   recordedAt: string | null;
+  recordUpdatedAt: string | null;
+  corrections: AttendanceCorrectionResult[];
 }
 
 export interface SessionAttendanceResult {
@@ -459,7 +500,7 @@ export interface SessionTimelineEventResult {
   createdAt: string;
 }
 
-export type TodayClassStatus = "scheduled" | "live" | "completed" | "missed";
+export type TodayClassStatus = "scheduled" | "live" | "completed" | "cancelled" | "missed";
 
 export interface TodayClassResult {
   timetableEntry: TimetableEntryResult;
@@ -477,7 +518,87 @@ export interface TodayTimetableResult {
   classes: TodayClassResult[];
   nextClass: TodayClassResult | null;
   completedCount: number;
+  cancelledCount: number;
   missedCount: number;
+  incompleteAttendanceCount: number;
+}
+
+export interface AttendanceReportFilters {
+  termId?: string;
+  classroomId?: string;
+  subjectId?: string;
+  teacherId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface AttendanceStatusTotals {
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  unrecorded: number;
+}
+
+export interface AttendanceReportSessionRow {
+  sessionId: string;
+  scheduledStart: string;
+  status: SessionStatus;
+  classroomId: string;
+  classroomName: string;
+  subjectId: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  enrolledCount: number;
+  recordedCount: number;
+  totals: AttendanceStatusTotals;
+  attendancePercentage: number;
+}
+
+export interface AttendanceReportStudentRow {
+  studentId: string;
+  studentNumber: string;
+  studentName: string;
+  classroomId: string;
+  classroomName: string;
+  subjectId: string;
+  subjectName: string;
+  sessionCount: number;
+  totals: AttendanceStatusTotals;
+  attendancePercentage: number;
+}
+
+export interface AttendanceReportResult {
+  scopeLabel: string;
+  termId: string;
+  termName: string;
+  timezone: string;
+  from: string;
+  to: string;
+  filters: AttendanceReportFilters;
+  totals: AttendanceStatusTotals;
+  attendancePercentage: number;
+  sessions: AttendanceReportSessionRow[];
+  students: AttendanceReportStudentRow[];
+}
+
+export interface AttendanceStudentReportResult {
+  studentId: string;
+  studentNumber: string;
+  studentName: string;
+  report: AttendanceReportResult;
+}
+
+export interface AttendanceSessionReportResult {
+  session: AttendanceReportSessionRow;
+  students: Array<{
+    studentId: string;
+    studentNumber: string;
+    studentName: string;
+    status: AttendanceStatus | null;
+    note: string | null;
+  }>;
 }
 
 export interface AssessmentResult {

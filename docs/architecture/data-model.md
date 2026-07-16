@@ -135,7 +135,7 @@ flowchart LR
 ## Service-enforced rules
 
 - Only `scheduled` sessions transition to `live`; only `live` sessions transition to `completed`.
-- Attendance and linked assessment scores cannot be changed after a session is completed or cancelled.
+- Normal attendance and linked assessment score entry stops after completion or cancellation. Owner/admin correction is a separate completed-session command that preserves immutable before/after history.
 - Attendance and scores are accepted only for active enrollment in the matching term and classroom.
 - Score values must be between zero and the assessment maximum.
 - Timetable intervals must use Monday-Friday, have increasing times, and must not overlap another active entry for the same teacher or classroom in the term.
@@ -171,13 +171,19 @@ stateDiagram-v2
     [*] --> scheduled: materialize timetable date
     scheduled --> live: start class
     live --> completed: end class
-    scheduled --> cancelled: cancel (future)
+    scheduled --> cancelled: cancel with reason
+    live --> cancelled: manager emergency cancel
     completed --> [*]
+    cancelled --> [*]
 ```
 
-Only `scheduled` may start and only `live` may end. A PostgreSQL partial unique index permits at most one `live` session per teacher, including concurrent requests. Completed sessions and their attendance are read-only. Attendance roster reads and writes join active `ClassEnrollment` by the session's exact term and classroom; student IDs from another classroom are rejected even when the teacher teaches both classrooms.
+Only `scheduled` may start and only `live` may end. Repeated materialize/start/end calls return the existing intended state where safe. A PostgreSQL partial unique index permits at most one `live` session per teacher, including concurrent requests. Completed and cancelled sessions never reopen. Attendance roster reads and writes join active `ClassEnrollment` by the session's exact term and classroom; student IDs from another classroom are rejected even when the teacher teaches both classrooms.
 
-Timeline events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `SESSION_ENDED`) belong to one school and one class session and are indexed by session/time. Timeline metadata is deliberately limited to occurrence times and attendance counts. Audit logs separately capture the actor, action, entity, and safe mutation metadata for operational accountability.
+Timeline events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `ATTENDANCE_CORRECTED`, `SESSION_ENDED`, `SESSION_CANCELLED`) belong to one school and one class session and are indexed by session/time. Timeline metadata is deliberately limited to safe identifiers, occurrence times, state changes, and attendance counts. Audit logs separately capture the actor, action, entity, and safe mutation metadata for operational accountability.
+
+`AttendanceCorrection` links one school, attendance record, class session, student, and optional actor. It stores before/after status and note plus the required human reason and timestamp. Corrections never rewrite or delete earlier correction/audit rows. Optimistic `AttendanceRecord.updatedAt` comparison rejects stale manager actions. `ClassSession.cancelledAt`, `cancelledById`, and `cancellationReason` capture the terminal cancellation fact; no reverse transition exists.
+
+Attendance reporting excludes cancelled and future scheduled sessions from its denominator. Live, completed, and past scheduled (missed) sessions count toward expected attendance; unrecorded enrolled students become `unrecorded`. Percentage is `(present + late) / (present + late + absent + leave + unrecorded) × 100`. School-wide display is explicitly labeled and aggregates remain keyed by classroom and subject.
 
 ## Runtime verification
 

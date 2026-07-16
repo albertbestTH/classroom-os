@@ -13,5 +13,5 @@ export default async function AttendancePage({ params }: { params: Promise<{ id:
     getClassSession({ schoolId: context.schoolId, sessionId: id }),
     getSessionAttendanceRoster({ schoolId: context.schoolId, sessionId: id }),
   ]);
-  return <AppShell><PageHeader eyebrow={`${session.subjectName} · ${session.classroomName}`} title="เช็กชื่อนักเรียน" description={`เฉพาะนักเรียนที่ลงทะเบียนใน ${session.classroomName} ภาคเรียน ${session.termName}`} /><AttendanceEditor initial={roster} /></AppShell>;
+  return <AppShell><PageHeader eyebrow={`${session.subjectName} · ${session.classroomName}`} title="เช็กชื่อนักเรียน" description={`เฉพาะนักเรียนที่ลงทะเบียนใน ${session.classroomName} ภาคเรียน ${session.termName}`} /><AttendanceEditor initial={roster} canCorrect={context.role !== "TEACHER"} /></AppShell>;
 }

@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -76,6 +76,12 @@ jobs:
 
       - name: Run authenticated API tests
         run: pnpm api:test
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: Run attendance end-to-end tests
+        run: pnpm e2e
 
       - name: Lint workspace
         run: pnpm lint

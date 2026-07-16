@@ -64,13 +64,13 @@ The command refuses production and non-local databases. Synthetic logins use `ow
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It provisions an ephemeral PostgreSQL 16 service, installs pnpm through Corepack, restores the pnpm store cache, applies committed migrations with `prisma migrate deploy`, and then runs database tests, authenticated API tests, lint, and build. CI uses synthetic data, a CI-only database password, and safe login-rate defaults.
+`.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It provisions an ephemeral PostgreSQL 16 service, installs pnpm through Corepack, restores the pnpm store cache, applies committed migrations with `prisma migrate deploy`, and then runs database tests, authenticated API tests, Playwright Chromium E2E, lint, and build. CI uses synthetic data, a CI-only database password, and safe login-rate defaults. Playwright bootstraps explicit synthetic classroom fixtures and removes its operational session data in global teardown.
 
 ## Authenticated API foundation
 
 Next.js route handlers under `apps/web/app/api` expose students, classrooms, timetables, sessions, attendance, assessments, scores, staff accounts, and teaching assignments. Every protected handler resolves the opaque session cookie at request time and derives tenant, actor, role, and teacher identity from that trusted record. Request bodies cannot override those identities.
 
-Successful responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "fieldErrors?" } }`. Sensitive responses are `no-store`. Cookie-authenticated mutations require a same-origin `Origin`, valid JSON content type, and bodies no larger than 64 KiB.
+Successful responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "fieldErrors?" } }`. Sensitive responses are `no-store`. Cookie-authenticated mutations require a verified public host origin (or browser `Sec-Fetch-Site: same-origin` when `Origin` is absent), valid JSON content type, and bodies no larger than 64 KiB.
 
 Login attempts are limited by a one-way hash of normalized email plus client IP. Defaults are five attempts per fifteen minutes with at most 10,000 in-memory buckets; configure them with `AUTH_LOGIN_RATE_LIMIT_MAX`, `AUTH_LOGIN_RATE_LIMIT_WINDOW_MS`, and `AUTH_LOGIN_RATE_LIMIT_MAX_BUCKETS`. The current implementation is appropriate for one application instance; multi-instance deployment requires Redis or another shared atomic store.
 
@@ -91,3 +91,11 @@ Subject, classroom, academic-year, and term mutations are tenant-scoped and audi
 The authenticated dashboard and `/timetable` now use real tenant-scoped data. Timetable entries belong to the current term and retain the exact teaching assignment behind their school, year, term, teacher, classroom, and subject context. Teachers see only their assignments; owner/admin users can filter school-wide entries by teacher, classroom, or subject.
 
 `GET /api/me/today` interprets the current date in `School.timezone`. Starting a scheduled item materializes one dated session from its timetable entry, snapshots its assignment, and then transitions `scheduled → live`. A teacher may have only one live session. The `/live` and `/sessions/:id` screens provide the Live Class flow, manual roster attendance, confirmed session end, and a read-only summary. Session timeline entries are teacher-facing operational events; `AuditLog` remains the compliance record for every mutation.
+
+## Attendance reporting and hardening
+
+`/attendance` provides Thai school-wide or exact-assignment reports by current term, date, classroom, subject, and teacher. Rows remain separated by classroom and subject. Attendance percentage is `(present + late) / expected attendance rows`; completed, live, and missed past sessions count, future scheduled sessions do not, and cancelled sessions are excluded. CSV export is UTF-8 with BOM, fixed columns, explicit scope/date metadata, formula-injection escaping, and a safe generated filename.
+
+Start, end, attendance-save, and daily materialization retries are idempotent where the intended result already exists. The UI preserves unsaved attendance selections in session storage and warns before leaving. Scheduled sessions may be cancelled with a reason; cancelling a live session is manager-only. Neither completed nor cancelled sessions can be reopened. Owner/admin users may correct an existing completed-session attendance row only with a reason; every correction stores immutable before/after values, adds a timeline event, and writes a separate sanitized audit entry.
+
+Run the synthetic browser suite with `pnpm e2e`. It covers teacher login, start/resume, attendance changes, save, end and summary, manager reporting, exact assignment isolation, and an unauthorized admin route. No production or real student data is used.

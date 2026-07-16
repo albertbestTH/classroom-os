@@ -20,6 +20,7 @@ export async function POST(request: NextRequest, route: SessionRouteContext) {
         trustedTenantInput(context, {
           sessionId: id,
           endedAt: optionalString(body, "endedAt"),
+          expectedUpdatedAt: optionalString(body, "expectedUpdatedAt"),
         }),
       );
     },

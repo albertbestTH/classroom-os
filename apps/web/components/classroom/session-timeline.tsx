@@ -3,7 +3,9 @@ import type { SessionTimelineEventResult } from "@classroom-os/types";
 const labels = {
   SESSION_STARTED: "เริ่มคาบเรียน",
   ATTENDANCE_UPDATED: "บันทึกการเข้าเรียน",
+  ATTENDANCE_CORRECTED: "แก้ไขการเข้าเรียนหลังจบคาบ",
   SESSION_ENDED: "จบคาบเรียน",
+  SESSION_CANCELLED: "ยกเลิกคาบเรียน",
 } as const;
 
 export function SessionTimeline({ events }: { events: SessionTimelineEventResult[] }) {

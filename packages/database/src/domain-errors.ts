@@ -2,6 +2,7 @@ import type { DomainErrorCode } from "@classroom-os/types";
 import { ZodError } from "zod";
 
 import { Prisma } from "./generated/prisma/client.js";
+import { AuthError } from "./auth/auth-errors.js";
 import {
   RepositoryValidationError,
   TenantRecordNotFoundError,
@@ -70,6 +71,7 @@ export async function withDomainErrors<T>(operation: () => Promise<T>): Promise<
   try {
     return await operation();
   } catch (error) {
+    if (error instanceof AuthError) throw error;
     throw mapToDomainError(error);
   }
 }

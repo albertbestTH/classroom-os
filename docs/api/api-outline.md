@@ -26,8 +26,9 @@ Authorization helpers are `requireAuthenticatedUser`, `requireRole`, `requireSch
 | Classroom | `createClassroom`, `updateClassroom`, `getClassroom`, `listClassrooms` |
 | Timetable | `createTimetableEntry`, `updateTimetableEntry`, `listTimetableEntries` |
 | Today | `getTodayTimetable` |
-| Session | `materializeClassSession`, `startClassSession`, `endClassSession`, `getClassSession`, `listClassSessionTimeline` |
-| Attendance | `getSessionAttendanceRoster`, `updateAttendanceBatch` |
+| Session | `materializeClassSession`, `startClassSession`, `endClassSession`, `cancelClassSession`, `getClassSession`, `listClassSessionTimeline` |
+| Attendance | `getSessionAttendanceRoster`, `updateAttendanceBatch`, `correctCompletedAttendance` |
+| Attendance report | `getAttendanceReport`, `getAttendanceStudentReport`, `getAttendanceSessionReport`, `createAttendanceReportCsv` |
 | Assessment | `createAssessment`, `updateScoreBatch` |
 
 Every method requires `schoolId`. At the server boundary, `trustedTenantInput` derives both `schoolId` and `actorUserId` from the session. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
@@ -59,7 +60,9 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `GET|POST /api/classrooms`; `GET|PATCH /api/classrooms/:id`
 - `GET|POST /api/timetable`; `PATCH /api/timetable/:id`
 - `POST /api/sessions` (compatibility materialization); `GET /api/sessions/:id`; `POST /start`; `POST /end`; `GET /timeline`
-- `GET|PUT /api/sessions/:id/attendance`
+- `GET|PUT /api/sessions/:id/attendance`; `POST /api/sessions/:id/attendance/corrections`
+- `POST /api/sessions/:id/cancel`
+- `GET /api/reports/attendance`; `GET /students/:id`; `GET /sessions/:id`; `GET /export`
 - `POST /api/assessments`; `PUT /api/assessments/:id/scores`
 - `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
 - `GET|POST /api/staff/:id/teaching-assignments`; `GET /api/teaching-assignments`
@@ -70,7 +73,7 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 
 Timetable and assessment creation accept a `teachingAssignmentId`, not teacher/tenant identity fields, and derive term, teacher, classroom, and subject from the scoped assignment. Attendance and score mutations require a classroom context and compare it with the canonical session/assessment before writing.
 
-Cookie-authenticated mutations require an exact same-origin `Origin`, `application/json`, and a body at or below 64 KiB. Deployments behind a proxy must preserve the public request origin correctly.
+Cookie-authenticated mutations require an `Origin` matching the effective public host, or a browser `Sec-Fetch-Site: same-origin` signal when `Origin` is absent, plus `application/json` and a body at or below 64 KiB. Deployments behind a proxy must preserve `Host` and `X-Forwarded-Proto` correctly.
 
 ## Admin console contracts
 
@@ -82,11 +85,13 @@ Creating or marking an academic year current clears the prior current year and a
 
 ## Operational timetable and session routes
 
-- `GET /api/me/today` returns the visible current-term schedule, next class, completed/missed counts, and school timezone. Teachers receive only their own assignment rows.
+- `GET /api/me/today` returns the visible current-term schedule, next class, completed/missed/cancelled/incomplete-attendance counts, and school timezone. Teachers receive only their own assignment rows.
 - `GET|POST /api/timetable` and `PATCH /api/timetable/:id` return display-safe assignment labels and enforce valid assignments plus teacher/classroom interval conflicts.
-- `POST /api/timetable/:id/materialize` accepts `{ "localDate": "YYYY-MM-DD" }`. It derives all trusted context from the timetable entry and rejects a second occurrence for that entry/date.
-- `GET /api/sessions/:id`, `POST /start`, and `POST /end` enforce exact assignment access and the `scheduled → live → completed` state machine.
-- `GET|PUT /api/sessions/:id/attendance` uses the canonical session classroom and only active enrolled students. PUT accepts a batch plus the matching `classroomId`; completed sessions reject mutations.
+- `POST /api/timetable/:id/materialize` accepts `{ "localDate": "YYYY-MM-DD" }`. It derives all trusted context from the timetable entry and returns the existing occurrence on a safe retry.
+- `GET /api/sessions/:id`, `POST /start`, `POST /end`, and `POST /cancel` enforce exact assignment access and the forward-only state graph. Start/end accept optional `expectedUpdatedAt`; live cancellation is manager-only and every cancellation requires a reason.
+- `GET|PUT /api/sessions/:id/attendance` uses the canonical session classroom and only active enrolled students. PUT accepts a batch plus the matching `classroomId`; identical retries are no-ops. `POST /attendance/corrections` is owner/admin-only, completed-only, reason-required, and version-checked.
 - `GET /api/sessions/:id/timeline` returns only sanitized classroom events.
+
+Attendance report endpoints default to the current term and its date range. Teachers are forcibly scoped to their exact assignments; managers may filter school-wide by classroom, subject, teacher, term, and date. Student and session detail endpoints independently reauthorize their target. CSV export is the intentional non-JSON response: it is `no-store`, UTF-8 BOM encoded, formula-injection escaped, and uses a safe fixed-pattern filename.
 
 Materialization, start/end, timetable changes, and attendance changes are audited transactionally. Timeline events are additionally written for teacher-visible session activity. Neither response surface exposes Prisma records, stack traces, tokens, passwords, attendance notes in timeline metadata, or cross-tenant existence information.

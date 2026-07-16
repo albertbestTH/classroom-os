@@ -22,10 +22,8 @@ export function getTodayTimetable(input: {
     const prisma = getPrismaClient();
     const school = await requireSchoolSettingsForSchool(prisma, input);
     const day = schoolDayBounds(school.timezone, input.now);
-    const [years, terms] = await Promise.all([
-      listAcademicYears({ schoolId: input.schoolId }),
-      listTerms({ schoolId: input.schoolId }),
-    ]);
+    const years = await listAcademicYears({ schoolId: input.schoolId });
+    const terms = await listTerms({ schoolId: input.schoolId });
     const currentAcademicYear = years.find((year) => year.isCurrent) ?? null;
     const currentTerm =
       terms.find(
@@ -42,35 +40,36 @@ export function getTodayTimetable(input: {
         classes: [],
         nextClass: null,
         completedCount: 0,
+        cancelledCount: 0,
         missedCount: 0,
+        incompleteAttendanceCount: 0,
       };
     }
     const teacherId = input.role === "TEACHER" ? input.teacherId ?? undefined : undefined;
-    const [entries, sessions] = await Promise.all([
-      listTimetableEntriesForSchool(prisma, {
+    const entries = await listTimetableEntriesForSchool(prisma, {
         schoolId: input.schoolId,
         termId: currentTerm.id,
         teacherId,
-      }),
-      listClassSessionsForSchool(prisma, {
+      });
+    const sessions = await listClassSessionsForSchool(prisma, {
         schoolId: input.schoolId,
         teacherId,
         startsAtOrAfter: day.startsAt,
         startsBefore: day.endsAt,
         take: 200,
-      }),
-    ]);
+      });
     const todayEntries = entries.filter(
       (entry) => entry.isActive && entry.weekday === isoWeekday(day.localDate),
     );
-    const detailedSessions = await Promise.all(
-      sessions.map((session) =>
-        requireClassSessionDetailsForSchool(prisma, {
+    const detailedSessions = [];
+    for (const session of sessions) {
+      detailedSessions.push(
+        await requireClassSessionDetailsForSchool(prisma, {
           schoolId: input.schoolId,
           sessionId: session.id,
         }),
-      ),
-    );
+      );
+    }
     const byEntry = new Map(
       detailedSessions
         .filter((session) => session.timetableEntryId)
@@ -93,6 +92,8 @@ export function getTodayTimetable(input: {
         ? "completed"
         : session?.status === "live"
           ? "live"
+          : session?.status === "cancelled"
+            ? "cancelled"
           : scheduledEnd < now
             ? "missed"
             : "scheduled";
@@ -117,7 +118,13 @@ export function getTodayTimetable(input: {
       classes,
       nextClass,
       completedCount: classes.filter((item) => item.status === "completed").length,
+      cancelledCount: classes.filter((item) => item.status === "cancelled").length,
       missedCount: classes.filter((item) => item.status === "missed").length,
+      incompleteAttendanceCount: classes.filter(
+        (item) =>
+          item.session?.status === "completed" &&
+          item.session.attendanceRecordedCount < item.session.enrolledStudentCount,
+      ).length,
     };
   });
 }

@@ -1,8 +1,13 @@
 import type {
+  AcademicYear,
   ClassSession,
-  Prisma,
+  Classroom,
   PrismaClient,
   SessionStatus,
+  Subject,
+  Teacher,
+  TeachingAssignment,
+  Term,
 } from "../generated/prisma/client.js";
 import {
   RepositoryValidationError,
@@ -14,7 +19,18 @@ import {
 } from "../tenant.js";
 
 type SessionReadClient = Pick<PrismaClient, "classSession">;
-type SessionDetailsClient = Pick<PrismaClient, "classSession" | "classEnrollment">;
+type SessionDetailsClient = Pick<
+  PrismaClient,
+  | "classSession"
+  | "classEnrollment"
+  | "teachingAssignment"
+  | "teacher"
+  | "classroom"
+  | "subject"
+  | "term"
+  | "academicYear"
+  | "attendanceRecord"
+>;
 type SessionWriteClient = Pick<
   PrismaClient,
   | "classSession"
@@ -25,21 +41,16 @@ type SessionWriteClient = Pick<
   | "subject"
 >;
 
-const sessionDetails = {
-  teachingAssignment: {
-    include: {
-      teacher: true,
-      classroom: true,
-      subject: true,
-      term: { include: { academicYear: true } },
-    },
-  },
-  _count: { select: { attendanceRecords: true } },
-} satisfies Prisma.ClassSessionInclude;
-
-export type ClassSessionWithDetails = Prisma.ClassSessionGetPayload<{
-  include: typeof sessionDetails;
-}> & { enrolledStudentCount: number };
+export type ClassSessionWithDetails = ClassSession & {
+  teachingAssignment: TeachingAssignment & {
+    teacher: Teacher;
+    classroom: Classroom;
+    subject: Subject;
+    term: Term & { academicYear: AcademicYear };
+  };
+  _count: { attendanceRecords: number };
+  enrolledStudentCount: number;
+};
 
 export type ListClassSessionsInput = TenantScope & {
   classroomId?: string;
@@ -121,9 +132,31 @@ export async function requireClassSessionDetailsForSchool(
   const sessionId = requireRecordId(input.sessionId, "sessionId");
   const session = await client.classSession.findUnique({
     where: { id: sessionId, schoolId },
-    include: sessionDetails,
   });
   if (!session) throw new TenantRecordNotFoundError("ClassSession");
+  const assignment = await client.teachingAssignment.findUnique({
+    where: { id: session.teachingAssignmentId, schoolId },
+  });
+  if (!assignment) throw new TenantRecordNotFoundError("TeachingAssignment");
+  const teacher = await client.teacher.findUnique({
+    where: { id: assignment.teacherId, schoolId },
+  });
+  const classroom = await client.classroom.findUnique({
+    where: { id: assignment.classroomId, schoolId },
+  });
+  const subject = await client.subject.findUnique({
+    where: { id: assignment.subjectId, schoolId },
+  });
+  const term = await client.term.findUnique({
+    where: { id: assignment.termId, schoolId },
+  });
+  if (!teacher || !classroom || !subject || !term) {
+    throw new TenantRecordNotFoundError("TeachingAssignment");
+  }
+  const academicYear = await client.academicYear.findUnique({
+    where: { id: term.academicYearId, schoolId },
+  });
+  if (!academicYear) throw new TenantRecordNotFoundError("AcademicYear");
   const enrolledStudentCount = await client.classEnrollment.count({
     where: {
       schoolId,
@@ -133,7 +166,21 @@ export async function requireClassSessionDetailsForSchool(
       leftAt: null,
     },
   });
-  return { ...session, enrolledStudentCount };
+  const attendanceRecordedCount = await client.attendanceRecord.count({
+    where: { schoolId, classSessionId: session.id },
+  });
+  return {
+    ...session,
+    teachingAssignment: {
+      ...assignment,
+      teacher,
+      classroom,
+      subject,
+      term: { ...term, academicYear },
+    },
+    _count: { attendanceRecords: attendanceRecordedCount },
+    enrolledStudentCount,
+  };
 }
 
 export async function createSessionFromTimetableForSchool(
@@ -218,6 +265,22 @@ export async function createSessionFromTimetableInScopeForSchool(
     });
 }
 
+export function findMaterializedSessionForSchool(
+  client: SessionReadClient,
+  input: TenantScope & { timetableEntryId: string; scheduledStart: Date },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.classSession.findUnique({
+    where: {
+      timetableEntryId_scheduledStart: {
+        timetableEntryId: requireRecordId(input.timetableEntryId, "timetableEntryId"),
+        scheduledStart: input.scheduledStart,
+      },
+      schoolId,
+    },
+  });
+}
+
 export async function updateClassSessionStatusForSchool(
   client: SessionReadClient,
   input: TenantScope & { sessionId: string; status: SessionStatus },
@@ -242,12 +305,18 @@ export async function transitionClassSessionForSchool(
     fromStatus: SessionStatus;
     toStatus: SessionStatus;
     occurredAt: Date;
+    expectedUpdatedAt?: Date;
   },
 ): Promise<ClassSession | null> {
   const schoolId = requireSchoolId(input);
   const sessionId = requireRecordId(input.sessionId, "sessionId");
   const update = await client.classSession.updateMany({
-    where: { id: sessionId, schoolId, status: input.fromStatus },
+    where: {
+      id: sessionId,
+      schoolId,
+      status: input.fromStatus,
+      ...(input.expectedUpdatedAt ? { updatedAt: input.expectedUpdatedAt } : {}),
+    },
     data: {
       status: input.toStatus,
       ...(input.toStatus === "live" ? { startedAt: input.occurredAt } : {}),
@@ -255,6 +324,38 @@ export async function transitionClassSessionForSchool(
     },
   });
 
+  if (update.count === 0) return null;
+  return requireClassSessionForSchool(client, { schoolId, sessionId });
+}
+
+export async function cancelClassSessionForSchool(
+  client: SessionReadClient,
+  input: TenantScope & {
+    sessionId: string;
+    fromStatus: "scheduled" | "live";
+    occurredAt: Date;
+    reason: string;
+    actorUserId?: string | null;
+    expectedUpdatedAt?: Date;
+  },
+): Promise<ClassSession | null> {
+  const schoolId = requireSchoolId(input);
+  const sessionId = requireRecordId(input.sessionId, "sessionId");
+  const update = await client.classSession.updateMany({
+    where: {
+      id: sessionId,
+      schoolId,
+      status: input.fromStatus,
+      ...(input.expectedUpdatedAt ? { updatedAt: input.expectedUpdatedAt } : {}),
+    },
+    data: {
+      status: "cancelled",
+      cancelledAt: input.occurredAt,
+      cancelledById: input.actorUserId ?? null,
+      cancellationReason: input.reason,
+      ...(input.fromStatus === "live" ? { endedAt: input.occurredAt } : {}),
+    },
+  });
   if (update.count === 0) return null;
   return requireClassSessionForSchool(client, { schoolId, sessionId });
 }

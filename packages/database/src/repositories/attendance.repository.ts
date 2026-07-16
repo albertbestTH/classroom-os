@@ -1,7 +1,9 @@
 import type {
+  AttendanceCorrection,
   AttendanceRecord,
   AttendanceStatus,
   ClassSession,
+  Prisma,
   PrismaClient,
 } from "../generated/prisma/client.js";
 import {
@@ -13,13 +15,25 @@ import {
 
 type AttendanceClient = Pick<
   PrismaClient,
-  "classSession" | "classEnrollment" | "attendanceRecord" | "user"
+  | "classSession"
+  | "classEnrollment"
+  | "attendanceRecord"
+  | "user"
 >;
+type CorrectionClient = AttendanceClient & Pick<PrismaClient, "attendanceCorrection">;
 
 export type AttendanceSession = Pick<
   ClassSession,
-  "id" | "schoolId" | "termId" | "classroomId" | "status"
+  "id" | "schoolId" | "termId" | "classroomId" | "status" | "updatedAt"
 >;
+
+const correctionWithActor = {
+  actor: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.AttendanceCorrectionInclude;
+
+export type AttendanceCorrectionWithActor = Prisma.AttendanceCorrectionGetPayload<{
+  include: typeof correctionWithActor;
+}>;
 
 export async function requireAttendanceSessionForSchool(
   client: AttendanceClient,
@@ -35,6 +49,7 @@ export async function requireAttendanceSessionForSchool(
       termId: true,
       classroomId: true,
       status: true,
+      updatedAt: true,
     },
   });
 
@@ -122,13 +137,12 @@ export async function listAttendanceForSessionForSchool(
 }
 
 export async function listAttendanceRosterForSchool(
-  client: AttendanceClient,
+  client: CorrectionClient,
   input: TenantScope & { sessionId: string },
 ) {
   const schoolId = requireSchoolId(input);
   const session = await requireAttendanceSessionForSchool(client, input);
-  const [enrollments, records] = await Promise.all([
-    client.classEnrollment.findMany({
+  const enrollments = await client.classEnrollment.findMany({
       where: {
         schoolId,
         termId: session.termId,
@@ -139,10 +153,80 @@ export async function listAttendanceRosterForSchool(
       },
       include: { student: true },
       orderBy: [{ student: { studentNumber: "asc" } }],
-    }),
-    client.attendanceRecord.findMany({
+    });
+  const records = await client.attendanceRecord.findMany({
       where: { schoolId, classSessionId: session.id },
-    }),
-  ]);
+      include: { corrections: { include: correctionWithActor, orderBy: { createdAt: "desc" } } },
+    });
   return { session, enrollments, records };
+}
+
+export async function requireAttendanceRecordForCorrectionForSchool(
+  client: CorrectionClient,
+  input: TenantScope & { sessionId: string; studentId: string },
+): Promise<AttendanceRecord> {
+  const schoolId = requireSchoolId(input);
+  const record = await client.attendanceRecord.findUnique({
+    where: {
+      classSessionId_studentId: {
+        classSessionId: requireRecordId(input.sessionId, "sessionId"),
+        studentId: requireRecordId(input.studentId, "studentId"),
+      },
+      schoolId,
+    },
+  });
+  if (!record) throw new TenantRecordNotFoundError("AttendanceRecord");
+  return record;
+}
+
+export async function updateAttendanceRecordAfterCorrectionForSchool(
+  client: CorrectionClient,
+  input: TenantScope & {
+    attendanceRecordId: string;
+    expectedUpdatedAt: Date;
+    actorUserId?: string | null;
+    status: AttendanceStatus;
+    note?: string | null;
+  },
+): Promise<AttendanceRecord | null> {
+  const schoolId = requireSchoolId(input);
+  const result = await client.attendanceRecord.updateMany({
+    where: {
+      id: requireRecordId(input.attendanceRecordId, "attendanceRecordId"),
+      schoolId,
+      updatedAt: input.expectedUpdatedAt,
+    },
+    data: {
+      status: input.status,
+      note: input.note ?? null,
+      recordedById: input.actorUserId ?? null,
+      recordedAt: new Date(),
+    },
+  });
+  if (result.count === 0) return null;
+  return client.attendanceRecord.findUnique({
+    where: { id: input.attendanceRecordId, schoolId },
+  });
+}
+
+export function createAttendanceCorrectionForSchool(
+  client: CorrectionClient,
+  input: TenantScope & Omit<AttendanceCorrection, "id" | "schoolId" | "createdAt">,
+): Promise<AttendanceCorrectionWithActor> {
+  const schoolId = requireSchoolId(input);
+  return client.attendanceCorrection.create({
+    data: {
+      schoolId,
+      attendanceRecordId: input.attendanceRecordId,
+      classSessionId: input.classSessionId,
+      studentId: input.studentId,
+      actorUserId: input.actorUserId,
+      beforeStatus: input.beforeStatus,
+      afterStatus: input.afterStatus,
+      beforeNote: input.beforeNote,
+      afterNote: input.afterNote,
+      reason: input.reason,
+    },
+    include: correctionWithActor,
+  });
 }

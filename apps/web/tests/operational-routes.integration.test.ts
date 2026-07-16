@@ -56,7 +56,8 @@ describe("operational timetable routes", () => {
     expect(created.status).toBe(201);
     const payload = await created.json() as { data: { id: string } };
     const duplicate = await materialize(request(`/api/timetable/${tenant.timetableEntry.id}/materialize`, login.token, "POST", { localDate }), route);
-    expect(duplicate.status).toBe(409);
+    expect(duplicate.status).toBe(201);
+    await expect(duplicate.json()).resolves.toMatchObject({ data: { id: payload.data.id } });
     const live = await startSession(request(`/api/sessions/${payload.data.id}/start`, login.token, "POST", {}), { params: Promise.resolve({ id: payload.data.id }) });
     expect(live.status).toBe(200);
     await expect(live.json()).resolves.toMatchObject({ data: { status: "live", classroomId: tenant.classroom.id } });

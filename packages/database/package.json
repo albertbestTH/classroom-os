@@ -24,6 +24,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:status": "prisma migrate status",
     "db:bootstrap:auth": "tsx scripts/bootstrap-auth.ts",
+    "db:e2e:cleanup": "tsx scripts/cleanup-e2e.ts",
     "db:studio": "prisma studio",
     "db:test": "pnpm --filter @classroom-os/types build && vitest run --config vitest.config.ts"
   },

@@ -59,7 +59,7 @@ describe("operational classroom workflow", () => {
       timezone: "Asia/Bangkok",
       classes: [{ session: { id: session.id }, timetableEntry: { classroomId: tenant.classroom.id } }],
     });
-    await expect(materializeClassSession(input)).rejects.toSatisfy((error) => hasCode(error, "CONFLICT"));
+    await expect(materializeClassSession(input)).resolves.toMatchObject({ id: session.id });
   });
 
   it("enforces roster isolation, live overlap, timeline events, and completed read-only state", async () => {

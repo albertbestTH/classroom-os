@@ -125,7 +125,11 @@ export function toClassSessionResult(
     scheduledEnd: session.scheduledEnd.toISOString(),
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
+    cancelledAt: session.cancelledAt?.toISOString() ?? null,
+    cancelledById: session.cancelledById,
+    cancellationReason: session.cancellationReason,
     status: session.status,
+    updatedAt: session.updatedAt.toISOString(),
     teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
     classroomName: assignment.classroom.name,
     subjectCode: assignment.subject.code,
@@ -144,6 +148,7 @@ export function toAttendanceResult(record: AttendanceRecord): AttendanceRecordRe
     status: record.status,
     note: record.note,
     recordedAt: record.recordedAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
   };
 }
 

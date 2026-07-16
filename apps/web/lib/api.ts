@@ -105,9 +105,14 @@ export async function readJsonObject(
 
 export function assertSameOrigin(request: NextRequest): void {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== request.nextUrl.origin) {
-    throw authError("FORBIDDEN", "The request origin is not allowed.");
-  }
+  const fetchSite = request.headers.get("sec-fetch-site");
+  const host = request.headers.get("host");
+  const forwardedProtocol = request.headers.get("x-forwarded-proto");
+  const requestProtocol = forwardedProtocol ?? new URL(request.url).protocol.replace(":", "");
+  const hostOrigin = host ? `${requestProtocol}://${host}` : null;
+  if (origin === request.nextUrl.origin || origin === hostOrigin) return;
+  if (!origin && fetchSite === "same-origin") return;
+  throw authError("FORBIDDEN", "The request origin is not allowed.");
 }
 
 export async function requireApiSession(request: NextRequest): Promise<ResolvedSessionResult> {

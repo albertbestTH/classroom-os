@@ -32,7 +32,7 @@ export function StartClassButton({
         { body: { localDate } },
       );
       const live = await requestApi<ClassSessionResult>(`/api/sessions/${session.id}/start`, {
-        body: {},
+        body: { expectedUpdatedAt: session.updatedAt },
       });
       router.push(`/sessions/${live.id}`);
       router.refresh();

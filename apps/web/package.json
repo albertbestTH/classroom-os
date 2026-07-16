@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "pnpm --filter @classroom-os/types build && pnpm --filter @classroom-os/database build && vitest run --config vitest.config.ts"
+    "test": "pnpm --filter @classroom-os/types build && pnpm --filter @classroom-os/database build && vitest run --config vitest.config.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@classroom-os/database": "workspace:*",
@@ -17,13 +18,14 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
-    "dotenv": "17.4.2",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "4.1.10"

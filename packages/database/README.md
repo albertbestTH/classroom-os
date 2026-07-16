@@ -105,7 +105,7 @@ The package root does not export Prisma Client or repositories. They remain inte
 
 Application code should call the service modules rather than repositories. Every public service method requires `schoolId`; mutations optionally accept `actorUserId`, validate with Zod, execute business changes and audit writes transactionally, and return API-facing contracts from `@classroom-os/types`.
 
-Services enforce session transitions, completed-session immutability, active enrollment for attendance and scores, assessment maximums, and teacher/classroom timetable overlap. Expected failures use `NOT_FOUND`, `TENANT_ACCESS_DENIED`, `CONFLICT`, `VALIDATION_ERROR`, or `INVALID_STATE_TRANSITION`. Database error messages and connection information are never returned.
+Services enforce session transitions, completed-session correction policy, active enrollment for attendance and scores, assessment maximums, and teacher/classroom timetable overlap. Expected failures use `NOT_FOUND`, `TENANT_ACCESS_DENIED`, `CONFLICT`, `VALIDATION_ERROR`, or `INVALID_STATE_TRANSITION`. Database error messages and connection information are never returned.
 
 Audit metadata is deliberately narrow. Never place passwords, secrets, tokens, full request bodies, biometric data, or production credentials in `metadata`.
 
@@ -131,7 +131,7 @@ For local UI work only:
 pnpm db:bootstrap:auth
 ```
 
-The script is idempotent, refuses `NODE_ENV=production`, refuses non-local hosts or databases other than `classroom_os`, and creates synthetic class A/B assignments plus an unassigned class C. Accounts are `owner@synthetic.classroom.test`, `admin@synthetic.classroom.test`, and `teacher@synthetic.classroom.test`; the synthetic-only password is `Classroom!Demo2026`. It never runs automatically in application startup or CI.
+The script is idempotent, refuses `NODE_ENV=production`, refuses non-local hosts or databases other than `classroom_os`, and creates synthetic class A/B assignments plus an unassigned class C. Accounts are `owner@synthetic.classroom.test`, `admin@synthetic.classroom.test`, and `teacher@synthetic.classroom.test`; the synthetic-only password is `Classroom!Demo2026`. It never runs in application startup; Playwright invokes it explicitly against the disposable CI database.
 
 ## Integration tests
 
@@ -176,6 +176,12 @@ Volume removal is deliberately not part of any package script.
 
 `materializeClassSession` accepts a scoped timetable entry and school-local date, validates its weekday and term, converts wall-clock times using `School.timezone`, and creates one scheduled session with immutable teaching-assignment lineage. `getTodayTimetable` returns current-year/current-term entries and dated status only for the caller's permitted teacher scope.
 
-`startClassSession` prevents a second live session for the teacher; `endClassSession` completes only a live session. Attendance roster reads join the session's exact term/classroom enrollment, and batch updates reject students from every other classroom. Completed sessions are read-only. These rules are service-enforced and supported by unique constraints, including the partial one-live-session-per-teacher index.
+`startClassSession` prevents a second live session for the teacher; `endClassSession` completes only a live session. Safe repeated materialize/start/end requests return the intended existing state. Attendance roster reads join the session's exact term/classroom enrollment, and batch updates reject students from every other classroom. Normal entry stops after completion; owner/admin correction requires an existing row, active exact enrollment, a reason, and the expected record version. `AttendanceCorrection` keeps immutable before/after values and a separate audit record.
 
-`SessionTimelineEvent` is not an audit substitute. It provides sanitized teacher-facing events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `SESSION_ENDED`) for one class session. `AuditLog` remains the broader mutation/accountability history. Timeline metadata may contain timestamps and aggregate status counts only—never credentials, tokens, student notes, biometric data, or raw request bodies.
+`SessionTimelineEvent` is not an audit substitute. It provides sanitized teacher-facing events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `ATTENDANCE_CORRECTED`, `SESSION_ENDED`, `SESSION_CANCELLED`) for one class session. `AuditLog` remains the broader mutation/accountability history. Timeline metadata may contain safe identifiers, timestamps, transitions, and aggregate status counts only—never credentials, tokens, free-text reasons, student notes, biometric data, or raw request bodies.
+
+`attendance-report.service` applies current-term defaults and school-timezone date bounds. Teacher scope is forced to the authenticated teacher; manager queries may filter classroom, subject, teacher, term, and dates. Percentage counts `present + late` over all expected non-cancelled, non-future attendance rows. Student aggregates stay keyed by classroom and subject. CSV output includes a UTF-8 BOM, explicit scope/date columns, safe quoting, and spreadsheet-formula escaping.
+
+Playwright uses `db:bootstrap:auth` for synthetic accounts, enrollments, and a deterministic current-day timetable. `db:e2e:cleanup` removes only the synthetic operational session data and refuses production/non-local databases. CI installs Chromium, runs `pnpm e2e`, and then lets the PostgreSQL service be discarded.
+
+Prisma 7.8 with `@prisma/adapter-pg` still emits the `pg` 8.22 deprecation warning when Prisma's internal query-plan interpreter fans out relation work on one adapter transaction connection. Application `Promise.all` calls on transaction clients were removed and hot-path session detail reads were serialized; trace stacks now terminate inside Prisma's `interpretNode`/adapter code with no application concurrent call site. The warning is not suppressed. Recheck after a compatible Prisma adapter release before upgrading to `pg` 9.

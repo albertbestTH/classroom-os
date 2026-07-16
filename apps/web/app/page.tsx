@@ -29,9 +29,9 @@ export default async function DashboardPage() {
       />
       <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="สถิติวันนี้">
         <StatCard label="คาบเรียนวันนี้" value={String(today.classes.length)} detail={today.currentTerm ? `${today.currentTerm.name} · ${today.currentTerm.academicYearName}` : "ยังไม่ได้กำหนดภาคเรียนปัจจุบัน"} />
-        <StatCard label="สอนเสร็จแล้ว" value={String(today.completedCount)} detail="คาบที่จบสมบูรณ์แล้ว" />
+        <StatCard label="สอนเสร็จแล้ว" value={String(today.completedCount)} detail={`เช็กชื่อไม่ครบ ${today.incompleteAttendanceCount} คาบ`} />
         <StatCard label="กำลังสอน" value={String(today.classes.filter((item) => item.status === "live").length)} detail="กลับเข้าสู่คาบได้ทันที" />
-        <StatCard label="ยังไม่ได้เริ่ม" value={String(today.missedCount)} detail="คาบที่เลยเวลาสิ้นสุดแล้ว" />
+        <StatCard label="ต้องติดตาม" value={String(today.missedCount + today.cancelledCount)} detail={`เลยเวลา ${today.missedCount} · ยกเลิก ${today.cancelledCount}`} />
       </section>
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <TodaySchedule today={today} />

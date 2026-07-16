@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  attendanceReportFiltersSchema,
+  cancelClassSessionSchema,
+  correctAttendanceSchema,
   createAssessmentSchema,
   createClassroomSchema,
   createStudentSchema,
@@ -140,5 +143,11 @@ describe("service validation schemas", () => {
         scores: [{ studentId, value: -1 }],
       }),
     ).toThrow();
+  });
+
+  it("requires bounded correction and cancellation reasons and ordered report dates", () => {
+    expect(() => cancelClassSessionSchema.parse({ schoolId, sessionId: randomUUID(), reason: "  " })).toThrow();
+    expect(() => correctAttendanceSchema.parse({ schoolId, sessionId: randomUUID(), studentId, status: "late", reason: "Synthetic correction", expectedRecordUpdatedAt: "not-a-date" })).toThrow();
+    expect(() => attendanceReportFiltersSchema.parse({ from: "2026-07-20", to: "2026-07-19" })).toThrow();
   });
 });

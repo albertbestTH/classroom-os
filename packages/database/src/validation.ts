@@ -147,12 +147,21 @@ export const startClassSessionSchema = z.object({
   ...tenantFields,
   sessionId: uuid("sessionId"),
   startedAt: isoDateTime.optional(),
+  expectedUpdatedAt: isoDateTime.optional(),
 });
 
 export const endClassSessionSchema = z.object({
   ...tenantFields,
   sessionId: uuid("sessionId"),
   endedAt: isoDateTime.optional(),
+  expectedUpdatedAt: isoDateTime.optional(),
+});
+
+export const cancelClassSessionSchema = z.object({
+  ...tenantFields,
+  sessionId: uuid("sessionId"),
+  reason: trimmedText("reason").max(500),
+  expectedUpdatedAt: isoDateTime.optional(),
 });
 
 export const updateAttendanceBatchSchema = z
@@ -182,6 +191,30 @@ export const updateAttendanceBatchSchema = z
       }
       ids.add(studentId);
     });
+  });
+
+export const correctAttendanceSchema = z.object({
+  ...tenantFields,
+  sessionId: uuid("sessionId"),
+  studentId: uuid("studentId"),
+  status: z.enum(ATTENDANCE_STATUSES),
+  note: nullableTrimmedText,
+  reason: trimmedText("reason").max(500),
+  expectedRecordUpdatedAt: isoDateTime,
+});
+
+export const attendanceReportFiltersSchema = z
+  .object({
+    termId: uuid("termId").optional(),
+    classroomId: uuid("classroomId").optional(),
+    subjectId: uuid("subjectId").optional(),
+    teacherId: uuid("teacherId").optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  })
+  .refine(({ from, to }) => !from || !to || from <= to, {
+    path: ["to"],
+    message: "to must be on or after from.",
   });
 
 export const createAssessmentSchema = z.object({

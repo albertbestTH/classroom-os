@@ -82,4 +82,14 @@ Timetable and session rows now store `teachingAssignmentId` in addition to their
 
 School-local dates are calculated with `Intl` and `School.timezone`, then converted to UTC instants for persistence. Materialization accepts a local `YYYY-MM-DD`, verifies the timetable weekday and term boundary, derives start/end instants from the entry's wall-clock times, and relies on `(timetableEntryId, scheduledStart)` uniqueness to reject a duplicate daily session.
 
-`SessionTimelineEvent` is a classroom-facing stream for start, attendance update, and end events. It stores only sanitized timestamps and counts. `AuditLog` is separate: it records mutation accountability across all domain entities and is not presented as the teacher's classroom narrative. A partial unique index on live sessions closes the concurrent-start race for each teacher.
+`SessionTimelineEvent` is a classroom-facing stream for start, attendance update/correction, end, and cancellation events. It stores only sanitized identifiers, timestamps, state changes, and counts. `AuditLog` is separate: it records mutation accountability across all domain entities and is not presented as the teacher's classroom narrative. A partial unique index on live sessions closes the concurrent-start race for each teacher.
+
+## Attendance reporting boundary
+
+`attendance-report.service` owns tenant/role scope, current-term defaults, school-timezone date boundaries, aggregation, and CSV serialization. Its repository always begins with `schoolId`; teacher callers are forcibly narrowed to their linked `teacherId`, while managers may apply school-wide classroom, subject, teacher, term, and date filters. Aggregates group by student, classroom, and subject so names or subjects never merge distinct classes.
+
+Attendance correction and cancellation are commands, not generic updates. Corrections require owner/admin context, a completed session, an enrolled student, an existing attendance row, a reason, and the expected record version. The current row changes transactionally while `AttendanceCorrection` preserves before/after status and note. Cancellation is a forward-only transition with a reason and actor/time metadata. Free-text reasons are stored on their domain records but excluded from audit/timeline JSON metadata.
+
+The dashboard derives missed, cancelled, live, completed, and incomplete-attendance counts from the same tenant-scoped session data. Re-entering a live session is a read of the canonical live row rather than a reverse lifecycle transition.
+
+CI runs service, route, component, and Playwright tests against an ephemeral PostgreSQL 16 service. The E2E global setup calls the guarded synthetic bootstrap; teardown removes only its operational session data. Browser state never supplies tenant, actor, role, or teacher identity.

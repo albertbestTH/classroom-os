@@ -17,9 +17,11 @@
     "db:migrate": "pnpm --filter @classroom-os/database db:migrate",
     "db:migrate:status": "pnpm --filter @classroom-os/database db:migrate:status",
     "db:bootstrap:auth": "pnpm --filter @classroom-os/database db:bootstrap:auth",
+    "db:e2e:cleanup": "pnpm --filter @classroom-os/database db:e2e:cleanup",
     "db:studio": "pnpm --filter @classroom-os/database db:studio",
     "db:test": "pnpm --filter @classroom-os/database db:test",
-    "api:test": "pnpm --filter web test"
+    "api:test": "pnpm --filter web test",
+    "e2e": "pnpm --filter web e2e"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

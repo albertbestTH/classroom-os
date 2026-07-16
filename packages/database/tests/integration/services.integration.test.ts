@@ -78,9 +78,7 @@ describe("tenant application services", () => {
     expect(live.status).toBe("live");
     await expect(
       startClassSession({ schoolId: tenant.school.id, sessionId: session.id }),
-    ).rejects.toSatisfy((error) =>
-      expectDomainCode(error, "INVALID_STATE_TRANSITION"),
-    );
+    ).resolves.toMatchObject({ id: session.id, status: "live" });
 
     const completed = await endClassSession({
       schoolId: tenant.school.id,
@@ -91,9 +89,7 @@ describe("tenant application services", () => {
     expect(completed.status).toBe("completed");
     await expect(
       endClassSession({ schoolId: tenant.school.id, sessionId: session.id }),
-    ).rejects.toSatisfy((error) =>
-      expectDomainCode(error, "INVALID_STATE_TRANSITION"),
-    );
+    ).resolves.toMatchObject({ id: session.id, status: "completed" });
   });
 
   it("allows attendance only for enrolled students and blocks completed edits", async () => {

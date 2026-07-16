@@ -8,6 +8,7 @@ const labels = {
   scheduled: "รอเริ่ม",
   live: "กำลังสอน",
   completed: "เสร็จแล้ว",
+  cancelled: "ยกเลิกแล้ว",
   missed: "ยังไม่ได้เริ่ม",
 } as const;
 
@@ -37,7 +38,7 @@ export function TodaySchedule({ today }: { today: TodayTimetableResult }) {
                 <p className="font-semibold">{item.timetableEntry.subjectName} · {item.timetableEntry.classroomName}</p>
                 <p className="mt-1 text-sm text-[#6B7280]">{item.timetableEntry.teacherName} · ห้อง {item.timetableEntry.room ?? "—"}</p>
               </div>
-              <StatusBadge variant={item.status === "completed" ? "success" : item.status === "live" ? "info" : item.status === "missed" ? "warning" : "neutral"}>{labels[item.status]}</StatusBadge>
+              <StatusBadge variant={item.status === "completed" ? "success" : item.status === "live" ? "info" : (item.status === "missed" || item.status === "cancelled") ? "warning" : "neutral"}>{labels[item.status]}</StatusBadge>
               {(item.status === "scheduled" || item.status === "live") ? <StartClassButton item={item} localDate={today.localDate} compact /> : null}
             </li>
           ))}
