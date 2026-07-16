@@ -6,27 +6,32 @@ export type NavigationItem = {
   href: string;
 };
 
-const dashboard = { label: "ภาพรวม", shortLabel: "ภาพรวม", href: "/" } as const;
-
 const managerItems: NavigationItem[] = [
-  dashboard,
+  { label: "ภาพรวมโรงเรียน", shortLabel: "ภาพรวมโรงเรียน", href: "/" },
   { label: "นักเรียน", shortLabel: "นักเรียน", href: "/students" },
   { label: "บุคลากร", shortLabel: "บุคลากร", href: "/staff" },
   { label: "ห้องเรียน", shortLabel: "ห้องเรียน", href: "/classrooms" },
   { label: "รายวิชา", shortLabel: "วิชา", href: "/subjects" },
+  { label: "ปีการศึกษา", shortLabel: "ปีการศึกษา", href: "/academic-years" },
+  { label: "ภาคเรียน", shortLabel: "ภาคเรียน", href: "/terms" },
   { label: "ตารางสอน", shortLabel: "ตารางสอน", href: "/timetable" },
-  { label: "Live Class", shortLabel: "Live", href: "/live" },
+  { label: "เช็คชื่อ", shortLabel: "เช็คชื่อ", href: "/attendance" },
   { label: "สมุดคะแนน", shortLabel: "คะแนน", href: "/gradebook" },
-  { label: "รายงาน", shortLabel: "รายงาน", href: "/reports" },
+  { label: "รายงานโรงเรียน", shortLabel: "รายงาน", href: "/reports" },
+  { label: "นำเข้าข้อมูล", shortLabel: "นำเข้า", href: "/import" },
+  { label: "เอกสาร", shortLabel: "เอกสาร", href: "/documents" },
 ];
 
 const teacherItems: NavigationItem[] = [
-  dashboard,
+  { label: "ภาพรวมการสอนของฉัน", shortLabel: "ภาพรวม", href: "/" },
   { label: "ชั้นเรียนของฉัน", shortLabel: "ชั้นเรียน", href: "/classrooms" },
   { label: "ตารางสอน", shortLabel: "ตารางสอน", href: "/timetable" },
   { label: "Live Class", shortLabel: "Live", href: "/live" },
-  { label: "เช็กชื่อ", shortLabel: "เช็กชื่อ", href: "/attendance" },
+  { label: "เช็คชื่อ", shortLabel: "เช็คชื่อ", href: "/attendance" },
   { label: "สมุดคะแนน", shortLabel: "คะแนน", href: "/gradebook" },
+  { label: "รายงานของฉัน", shortLabel: "รายงาน", href: "/reports" },
+  { label: "เอกสาร", shortLabel: "เอกสาร", href: "/documents" },
+  { label: "โปรไฟล์", shortLabel: "โปรไฟล์", href: "/profile" },
 ];
 
 export function navigationForRole(role: UserRole): NavigationItem[] {

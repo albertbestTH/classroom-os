@@ -219,7 +219,10 @@ export const attendanceReportFiltersSchema = z
 
 export const dashboardOverviewFiltersSchema = z.object({
   days: z.union([z.literal(7), z.literal(30)]).optional(),
+  termId: uuid("termId").optional(),
+  teachingAssignmentId: uuid("teachingAssignmentId").optional(),
   classroomId: uuid("classroomId").optional(),
+  subjectId: uuid("subjectId").optional(),
   teacherId: uuid("teacherId").optional(),
 });
 

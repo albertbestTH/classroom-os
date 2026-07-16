@@ -45,6 +45,7 @@ describe("admin console API routes", () => {
   it("enforces owner, admin, and teacher access and staff validation", async () => {
     const { ownerToken, adminToken, teacherToken } = await setupManagers();
     expect((await getStaff(request("/api/staff", { token: teacherToken }))).status).toBe(403);
+    expect((await postStaff(request("/api/staff", { token: teacherToken, method: "POST", json: { firstName: "Synthetic", lastName: "Blocked", email: `blocked-teacher-${randomUUID()}@example.invalid`, role: "TEACHER", temporaryPassword: "Synthetic!Blocked2026" } }))).status).toBe(403);
     expect((await getSubjects(request("/api/subjects", { token: teacherToken }))).status).toBe(403);
     expect((await getAcademicYears(request("/api/academic-years", { token: teacherToken }))).status).toBe(403);
     for (const token of [ownerToken, adminToken]) {

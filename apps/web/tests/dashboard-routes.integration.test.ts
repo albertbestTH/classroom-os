@@ -30,11 +30,29 @@ describe("dashboard overview route", () => {
 
     const response = await getOverview(request("/api/dashboard/overview", login.token));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ data: { scope: "ASSIGNED_CLASSES", days: 7, timezone: "Asia/Bangkok" } });
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        scope: "TEACHER",
+        viewerRole: "TEACHER",
+        selectedTeacher: null,
+        days: 7,
+        timezone: "Asia/Bangkok",
+        availableTeachingContexts: [expect.objectContaining({
+          teachingAssignmentId: tenant.teachingAssignment.id,
+          teacherId: tenant.teacher.id,
+          classroomId: tenant.classroom.id,
+          subjectId: tenant.subject.id,
+        })],
+        selectedTeachingContext: expect.objectContaining({ teachingAssignmentId: tenant.teachingAssignment.id }),
+      },
+    });
 
     for (const path of [
       "/api/dashboard/overview?days=9",
+      "/api/dashboard/overview?termId=not-a-uuid",
       "/api/dashboard/overview?classroomId=not-a-uuid",
+      "/api/dashboard/overview?subjectId=not-a-uuid",
+      "/api/dashboard/overview?teachingAssignmentId=not-a-uuid",
       `/api/dashboard/overview?schoolId=${tenant.school.id}`,
       "/api/dashboard/overview?role=ADMIN",
       "/api/dashboard/overview?days=30",

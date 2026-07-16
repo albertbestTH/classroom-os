@@ -6,13 +6,16 @@ import type {
   DashboardOverviewResult,
   DashboardRepeatedAbsence,
   DashboardTrendPoint,
+  TeachingContext,
   TodayClassResult,
   TrustedAuthContext,
 } from "@classroom-os/types";
 
 import { requireSchoolAccess } from "../auth/authorization.js";
 import { authError } from "../auth/auth-errors.js";
+import { domainError } from "../domain-errors.js";
 import { dashboardOverviewFiltersSchema } from "../validation.js";
+import { listTeachingAssignments } from "./account.service.js";
 import { getAttendanceReport } from "./attendance-report.service.js";
 import { executeTenantService } from "./service-utils.js";
 import { getTodayTimetable } from "./today.service.js";
@@ -56,7 +59,26 @@ function filterTodayClasses(
 ): TodayClassResult[] {
   return classes.filter(({ timetableEntry }) =>
     (!filters.classroomId || timetableEntry.classroomId === filters.classroomId) &&
+    (!filters.subjectId || timetableEntry.subjectId === filters.subjectId) &&
     (!filters.teacherId || timetableEntry.teacherId === filters.teacherId));
+}
+
+function toTeachingContext(
+  assignment: Awaited<ReturnType<typeof listTeachingAssignments>>[number],
+): TeachingContext {
+  return {
+    academicYearId: assignment.academicYearId,
+    academicYearName: assignment.academicYearName,
+    termId: assignment.termId,
+    termName: assignment.termName,
+    teachingAssignmentId: assignment.id,
+    teacherId: assignment.teacherId,
+    teacherName: assignment.teacherName,
+    classroomId: assignment.classroomId,
+    classroomName: assignment.classroomName,
+    subjectId: assignment.subjectId,
+    subjectName: assignment.subjectName,
+  };
 }
 
 function classHref(item: TodayClassResult): string {
@@ -73,13 +95,11 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
     if (auth.role === "TEACHER" && parsed.days === 30) {
       throw authError("FORBIDDEN", "The 30-day school view is available to managers only.");
     }
+    if (auth.role === "TEACHER" && parsed.termId) {
+      throw authError("FORBIDDEN", "Teachers use the current assigned term from their trusted context.");
+    }
 
     const days = auth.role === "TEACHER" ? 7 : (parsed.days ?? 7);
-    const filters: DashboardOverviewFilters = {
-      days,
-      ...(parsed.classroomId ? { classroomId: parsed.classroomId } : {}),
-      ...(auth.role !== "TEACHER" && parsed.teacherId ? { teacherId: parsed.teacherId } : {}),
-    };
     const now = input.now ?? new Date();
     const today = await getTodayTimetable({
       schoolId: input.schoolId,
@@ -87,15 +107,75 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
       teacherId: auth.teacherId,
       now,
     });
-    const to = localDateForInstant(now, today.timezone);
+    const assignments = await listTeachingAssignments({ auth });
+    const allTeachingContexts = assignments.map(toTeachingContext);
+    const selectedTermId = auth.role === "TEACHER"
+      ? today.currentTerm?.id
+      : (parsed.termId ?? today.currentTerm?.id ?? allTeachingContexts[0]?.termId);
+    if (parsed.termId && !allTeachingContexts.some(({ termId }) => termId === parsed.termId)) {
+      throw authError("FORBIDDEN", "The selected term is not available in this school teaching context.");
+    }
+    const availableTeachingContexts = allTeachingContexts.filter(({ termId }) => termId === selectedTermId);
+    if (parsed.teacherId && !availableTeachingContexts.some(({ teacherId }) => teacherId === parsed.teacherId)) {
+      throw authError("FORBIDDEN", "The selected teacher is not available in this school and term.");
+    }
+    const teacherScopedContexts = availableTeachingContexts.filter(
+      ({ teacherId }) => !parsed.teacherId || teacherId === parsed.teacherId,
+    );
+    const matchingContexts = teacherScopedContexts.filter((context) =>
+      (!parsed.teachingAssignmentId || context.teachingAssignmentId === parsed.teachingAssignmentId) &&
+      (!parsed.classroomId || context.classroomId === parsed.classroomId) &&
+      (!parsed.subjectId || context.subjectId === parsed.subjectId));
+    const hasContextFilter = Boolean(parsed.teachingAssignmentId || parsed.classroomId || parsed.subjectId);
+    if (hasContextFilter && matchingContexts.length === 0) {
+      if (auth.role === "TEACHER") {
+        throw authError("FORBIDDEN", "The selected teaching context is not assigned to this teacher.");
+      }
+      throw domainError("VALIDATION_ERROR", "The selected teacher, classroom, and subject are not one teaching assignment.");
+    }
+    const selectedTeachingContext =
+      parsed.teachingAssignmentId ||
+      (parsed.classroomId && matchingContexts.length === 1) ||
+      (auth.role === "TEACHER" && !hasContextFilter && availableTeachingContexts.length === 1)
+        ? matchingContexts[0] ?? availableTeachingContexts[0] ?? null
+        : null;
+    const selectedTeacherId = selectedTeachingContext?.teacherId ?? parsed.teacherId;
+    const selectedTeacherContext = selectedTeacherId
+      ? availableTeachingContexts.find(({ teacherId }) => teacherId === selectedTeacherId) ?? null
+      : null;
+    const classroomId = selectedTeachingContext?.classroomId ?? parsed.classroomId;
+    const subjectId = selectedTeachingContext?.subjectId ?? parsed.subjectId;
+    const teacherId = auth.role === "TEACHER"
+      ? undefined
+      : selectedTeacherId;
+    const filters: DashboardOverviewFilters = {
+      days,
+      ...(selectedTermId ? { termId: selectedTermId } : {}),
+      ...(selectedTeachingContext ? { teachingAssignmentId: selectedTeachingContext.teachingAssignmentId } : {}),
+      ...(classroomId ? { classroomId } : {}),
+      ...(subjectId ? { subjectId } : {}),
+      ...(teacherId ? { teacherId } : {}),
+    };
+    const isCurrentTerm = selectedTermId === today.currentTerm?.id;
+    let to = localDateForInstant(now, today.timezone);
+    if (selectedTermId && !isCurrentTerm) {
+      const termRange = await getAttendanceReport({
+        schoolId: input.schoolId,
+        auth,
+        filters: { termId: selectedTermId },
+        now,
+      });
+      to = termRange.to;
+    }
     const from = addLocalDays(to, -(days - 1));
-    const report = today.currentTerm
+    const report = selectedTermId
       ? await getAttendanceReport({
           schoolId: input.schoolId,
           auth,
           filters: {
-            termId: today.currentTerm.id,
+            termId: selectedTermId,
             classroomId: filters.classroomId,
+            subjectId: filters.subjectId,
             teacherId: filters.teacherId,
             from,
             to,
@@ -103,13 +183,14 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
           now,
         })
       : null;
-    const todayReport = report
+    const todayReport = report && isCurrentTerm
       ? await getAttendanceReport({
           schoolId: input.schoolId,
           auth,
           filters: {
             termId: report.termId,
             classroomId: filters.classroomId,
+            subjectId: filters.subjectId,
             teacherId: filters.teacherId,
             from: to,
             to,
@@ -118,7 +199,7 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
         })
       : null;
 
-    const visibleClasses = filterTodayClasses(today.classes, filters);
+    const visibleClasses = isCurrentTerm ? filterTodayClasses(today.classes, filters) : [];
     const visibleToday = {
       ...today,
       classes: visibleClasses,
@@ -272,23 +353,26 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
       });
     }
 
-    const classroomOptions = new Map<string, string>();
-    const teacherOptions = new Map<string, string>();
-    for (const session of report?.sessions ?? []) {
-      classroomOptions.set(session.classroomId, session.classroomName);
-      teacherOptions.set(session.teacherId, session.teacherName);
-    }
-    visibleClasses.forEach(({ timetableEntry }) => {
-      classroomOptions.set(timetableEntry.classroomId, timetableEntry.classroomName);
-      teacherOptions.set(timetableEntry.teacherId, timetableEntry.teacherName);
-    });
+    const termOptions = new Map(allTeachingContexts.map(({ termId, termName }) => [termId, termName]));
+    const classroomOptions = new Map(availableTeachingContexts.map(({ classroomId, classroomName }) => [classroomId, classroomName]));
+    const subjectOptions = new Map(availableTeachingContexts.map(({ subjectId, subjectName }) => [subjectId, subjectName]));
+    const teacherOptions = new Map(availableTeachingContexts.map(({ teacherId, teacherName }) => [teacherId, teacherName]));
+    const scope = auth.role === "TEACHER" ? "TEACHER" : filters.teacherId ? "TEACHER_FILTERED" : "SCHOOL";
+    const scopeLabel = scope === "TEACHER"
+      ? "ภาพรวมการสอนของฉัน"
+      : scope === "TEACHER_FILTERED"
+        ? `กำลังดูข้อมูลของครู: ${selectedTeacherContext?.teacherName ?? ""}`
+        : "ภาพรวมทั้งโรงเรียน";
 
     return {
-      scope: auth.role === "TEACHER" ? "ASSIGNED_CLASSES" : "SCHOOL_WIDE",
-      scopeLabel:
-        auth.role === "TEACHER"
-          ? "เฉพาะชั้นเรียนที่ได้รับมอบหมาย"
-          : "ภาพรวมทั้งโรงเรียน",
+      scope,
+      viewerRole: auth.role,
+      scopeLabel,
+      selectedTeacher: auth.role !== "TEACHER" && selectedTeacherContext
+        ? { id: selectedTeacherContext.teacherId, label: selectedTeacherContext.teacherName }
+        : null,
+      availableTeachingContexts,
+      selectedTeachingContext,
       timezone: today.timezone,
       localDate: today.localDate,
       from,
@@ -319,7 +403,9 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
       actions: actions.slice(0, 10),
       repeatedAbsences,
       filterOptions: {
+        terms: [...termOptions].map(([id, label]) => ({ id, label })),
         classrooms: [...classroomOptions].map(([id, label]) => ({ id, label })),
+        subjects: [...subjectOptions].map(([id, label]) => ({ id, label })),
         teachers: [...teacherOptions].map(([id, label]) => ({ id, label })),
       },
     };

@@ -13,6 +13,12 @@ const roleLabels: Record<CurrentUserResult["role"], string> = {
   TEACHER: "ครูผู้สอน",
 };
 
+const workspaceLabels: Record<CurrentUserResult["role"], string> = {
+  SCHOOL_OWNER: "พื้นที่บริหารโรงเรียน",
+  ADMIN: "พื้นที่บริหารโรงเรียน",
+  TEACHER: "พื้นที่ทำงานของครู",
+};
+
 function isActiveRoute(pathname: string, href: string) {
   return href === "/" ? pathname === href : pathname.startsWith(href);
 }
@@ -47,10 +53,10 @@ export function Sidebar({ currentUser }: { currentUser: CurrentUserResult }) {
           aria-label="Classroom OS หน้าภาพรวม"
         >
           <span className="block text-xl font-bold tracking-tight">Classroom OS</span>
-          <span className="mt-1 block text-sm text-slate-400">พื้นที่ทำงานสำหรับครู</span>
+          <span className="mt-1 block text-sm text-slate-400">{workspaceLabels[currentUser.role]}</span>
         </Link>
 
-        <nav className="mt-10" aria-label="เมนูหลัก">
+        <nav className="mt-8 min-h-0 flex-1 overflow-y-auto pr-1" aria-label={workspaceLabels[currentUser.role]}>
           <ul className="space-y-2">
             {navigationItems.map((item) => {
               const active = isActiveRoute(pathname, item.href);

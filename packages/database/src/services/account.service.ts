@@ -109,6 +109,7 @@ function toAssignmentResult(
     schoolId: assignment.schoolId,
     userId: assignment.teacher.userId,
     teacherId: assignment.teacherId,
+    academicYearId: assignment.term.academicYear.id,
     termId: assignment.termId,
     classroomId: assignment.classroomId,
     subjectId: assignment.subjectId,

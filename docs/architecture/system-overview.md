@@ -70,6 +70,14 @@ The web admin console uses server components for authenticated initial reads and
 
 Sidebar items come from a pure role-to-navigation mapping. This improves discoverability but is not a security boundary. Page render functions and route handlers independently enforce roles, tenant scope, and exact teaching assignments.
 
+## Role-specific workspaces
+
+The authenticated `/` route is server-rendered from the resolved role. A teacher lands in the Teacher Workspace and sees only personal teaching navigation and metrics; an owner or admin lands in School Administration and sees an explicitly school-wide dashboard. There is no role switch in browser state. The `(teacher)` and `(admin)` App Router groups provide server-side layout guards for role-exclusive pages while shared operational routes continue to authorize each request from the session.
+
+Teacher navigation contains personal overview, assigned classes, timetable, Live Class, attendance, gradebook, personal reports, documents, and profile. School Administration contains students, staff, school classrooms and subjects, academic calendar, timetable, attendance, gradebook, reports, import placeholder, and documents; settings are owner-only. Staff pages and handlers require owner/admin authorization even if opened directly.
+
+`TeachingContext` is the reusable authorization/display tuple `{ academicYearId, termId, teachingAssignmentId, teacherId, classroomId, subjectId }`. The dashboard service creates these tuples from current-term teaching assignments. For teachers, the trusted session supplies `teacherId` and only their contexts are returned. For managers, teacher/classroom/subject selections must match at least one same-school assignment; invalid mixed combinations are rejected rather than broadened.
+
 `subject.service` and `academic-calendar.service` extend the application boundary. Their repositories contain every Prisma query and always qualify records by `schoolId`. Mutations write sanitized audit records in the same transaction. Current academic periods are switched transactionally and backed by PostgreSQL partial unique indexes to prevent concurrent writers from creating multiple current years or terms.
 
 Assignment results include display-safe teacher, classroom, subject, term, and academic-year labels. These labels preserve the complete assignment identity in the UI: the same subject taught in classrooms A and B appears as two rows and never becomes a combined class scope.
@@ -96,7 +104,9 @@ CI runs service, route, component, and Playwright tests against an ephemeral Pos
 
 ## Dashboard analytics boundary
 
-`dashboard.service` composes the tenant-scoped attendance-report and today services; it does not expose or pass Prisma records to the web application. The authenticated session is the only source of school, role, and teacher identity. Teacher requests are forcibly limited to their linked teacher profile and exact assignments. Manager responses are explicitly labeled school-wide and may apply validated 7/30-day, classroom, or teacher filters.
+`dashboard.service` composes the tenant-scoped account, attendance-report, and today services; it does not expose or pass Prisma records to the web application. The authenticated session is the only source of school, role, and teacher identity. Teacher requests are forcibly limited to their linked teacher profile and exact current-term assignments. Manager responses are explicitly labeled school-wide and may apply validated 7/30-day, term, teacher, classroom, or subject filters.
+
+Every dashboard response includes `scope` (`TEACHER`, `SCHOOL`, or `TEACHER_FILTERED`), `viewerRole`, optional manager `selectedTeacher`, `availableTeachingContexts`, and optional `selectedTeachingContext`. These fields describe data scope, not authenticated identity. School-wide and teacher-filtered manager states use distinct copy and visual treatment.
 
 Attendance comparisons group by stable classroom and subject IDs. This keeps classroom A and B separate even when both teach the same subject or share a display name. Repeated-absence alerts inherit the same assignment scope, and all dashboard links lead back to routes that independently reauthorize their session or classroom context. Cross-school rows cannot enter the source reports.
 

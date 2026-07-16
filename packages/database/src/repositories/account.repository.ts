@@ -161,7 +161,7 @@ export function createTeachingAssignmentForSchool(
       classroom: { select: { name: true } },
       subject: { select: { code: true, name: true } },
       term: {
-        select: { name: true, academicYear: { select: { name: true } } },
+        select: { name: true, academicYear: { select: { id: true, name: true } } },
       },
     },
   });
@@ -182,7 +182,7 @@ export function listTeachingAssignmentsForSchool(
       classroom: { select: { name: true } },
       subject: { select: { code: true, name: true } },
       term: {
-        select: { name: true, academicYear: { select: { name: true } } },
+        select: { name: true, academicYear: { select: { id: true, name: true } } },
       },
     },
     orderBy: [
@@ -206,7 +206,7 @@ export async function requireTeachingAssignmentForSchool(
       classroom: { select: { name: true } },
       subject: { select: { code: true, name: true } },
       term: {
-        select: { name: true, academicYear: { select: { name: true } } },
+        select: { name: true, academicYear: { select: { id: true, name: true } } },
       },
     },
   });

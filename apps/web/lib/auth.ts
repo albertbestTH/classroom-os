@@ -38,6 +38,12 @@ export async function requireAdminWebSession(): Promise<ResolvedSessionResult> {
   return session;
 }
 
+export async function requireTeacherWebSession(): Promise<ResolvedSessionResult> {
+  const session = await requireWebSession();
+  if (session.context.role !== "TEACHER") redirect("/");
+  return session;
+}
+
 export async function requireOwnerWebSession(): Promise<ResolvedSessionResult> {
   const session = await requireWebSession();
   if (session.context.role !== "SCHOOL_OWNER") redirect("/");

@@ -100,6 +100,7 @@ export interface TeachingAssignmentResult {
   schoolId: string;
   userId: string;
   teacherId: string;
+  academicYearId: string;
   termId: string;
   classroomId: string;
   subjectId: string;
@@ -603,8 +604,25 @@ export interface AttendanceSessionReportResult {
 
 export interface DashboardOverviewFilters {
   days?: 7 | 30;
+  termId?: string;
+  teachingAssignmentId?: string;
   classroomId?: string;
+  subjectId?: string;
   teacherId?: string;
+}
+
+export interface TeachingContext {
+  academicYearId: string;
+  academicYearName: string;
+  termId: string;
+  termName: string;
+  teachingAssignmentId: string;
+  teacherId: string;
+  teacherName: string;
+  classroomId: string;
+  classroomName: string;
+  subjectId: string;
+  subjectName: string;
 }
 
 export interface DashboardAttendanceSummary {
@@ -680,8 +698,12 @@ export interface DashboardFilterOption {
 }
 
 export interface DashboardOverviewResult {
-  scope: "ASSIGNED_CLASSES" | "SCHOOL_WIDE";
+  scope: "TEACHER" | "SCHOOL" | "TEACHER_FILTERED";
+  viewerRole: UserRole;
   scopeLabel: string;
+  selectedTeacher: DashboardFilterOption | null;
+  availableTeachingContexts: TeachingContext[];
+  selectedTeachingContext: TeachingContext | null;
   timezone: string;
   localDate: string;
   from: string;
@@ -698,7 +720,9 @@ export interface DashboardOverviewResult {
   actions: DashboardActionItem[];
   repeatedAbsences: DashboardRepeatedAbsence[];
   filterOptions: {
+    terms: DashboardFilterOption[];
     classrooms: DashboardFilterOption[];
+    subjects: DashboardFilterOption[];
     teachers: DashboardFilterOption[];
   };
 }

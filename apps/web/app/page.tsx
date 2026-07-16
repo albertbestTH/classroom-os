@@ -8,16 +8,15 @@ import { AttendanceTrendChart } from "@/components/dashboard/attendance-trend-ch
 import { ClassroomComparisonChart } from "@/components/dashboard/classroom-comparison-chart";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
+import { DashboardStatGrid } from "@/components/dashboard/dashboard-stat-grid";
 import { NextClassCard } from "@/components/dashboard/next-class-card";
 import { SessionStatusChart } from "@/components/dashboard/session-status-chart";
+import { TeacherContextFilters } from "@/components/dashboard/teacher-context-filters";
 import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
 import { requireWebSession } from "@/lib/auth";
 import { dashboardFiltersFromSearchParams } from "@/lib/dashboard";
 
-type DashboardPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+type DashboardPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 function toUrlSearchParams(values: Record<string, string | string[] | undefined>) {
   const params = new URLSearchParams();
@@ -30,58 +29,49 @@ function toUrlSearchParams(values: Record<string, string | string[] | undefined>
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const [{ context, user }, query] = await Promise.all([requireWebSession(), searchParams]);
-  const overview = await getDashboardOverview({
-    schoolId: context.schoolId,
-    auth: context,
-    filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)),
-  });
+  const overview = await getDashboardOverview({ schoolId: context.schoolId, auth: context, filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)) });
   const isTeacher = context.role === "TEACHER";
-  const dateLabel = new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "full",
-    timeZone: overview.timezone,
-  }).format(new Date());
+  const dateLabel = new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeZone: overview.timezone }).format(new Date());
 
   return (
     <AppShell>
       <PageHeader
-        eyebrow={`${dateLabel} · ${overview.scopeLabel}`}
-        title={`สวัสดีครับ ${user.firstName}`}
-        description={isTeacher ? "คาบเรียน การเช็กชื่อ และสิ่งที่ต้องจัดการสำหรับชั้นเรียนที่คุณได้รับมอบหมาย" : "ข้อมูลทั้งโรงเรียนจะแสดงอย่างชัดเจนและแยกตามชั้นเรียนกับรายวิชา"}
+        eyebrow={`${dateLabel} · ${isTeacher ? "พื้นที่ทำงานของครู" : "พื้นที่บริหารโรงเรียน"}`}
+        title={isTeacher ? `สวัสดีครับ ครู${user.firstName}` : "ภาพรวมโรงเรียน"}
+        description={isTeacher ? "ภาพรวมการสอนของคุณวันนี้ ใช้ข้อมูลจากโปรไฟล์ครูและชั้นเรียนที่ได้รับมอบหมายเท่านั้น" : "ข้อมูลระดับโรงเรียนแยกตามครู ชั้นเรียน และรายวิชา โดยค่าเริ่มต้นเป็นภาพรวมทั้งโรงเรียน"}
       />
 
-      {!isTeacher ? <div className="mt-6"><DashboardFilters overview={overview} /></div> : null}
-
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="ตัวเลขสำคัญวันนี้">
-        <StatCard label="อัตราเข้าเรียนวันนี้" value={`${overview.attendance.attendancePercentage}%`} detail={`มาเรียนหรือมาสาย ${overview.attendance.attendedCount}/${overview.attendance.eligibleCount} รายการ`} />
-        <StatCard label="บันทึกการเข้าเรียนครบ" value={`${overview.attendance.completionPercentage}%`} detail={`บันทึกแล้ว ${overview.attendance.recordedCount}/${overview.attendance.eligibleCount} รายการ`} />
-        <StatCard label="คาบกำลังสอน" value={String(overview.sessionStatus.live)} detail={`เสร็จแล้ว ${overview.sessionStatus.completed} · รอเริ่ม ${overview.sessionStatus.scheduled}`} />
-        <StatCard label="ต้องติดตาม" value={String(overview.actions.length)} detail={`เลยเวลา ${overview.sessionStatus.missed} · เช็กชื่อไม่ครบ ${overview.sessionStatus.attendanceIncomplete}`} />
-      </section>
+      <div className="mt-6">{isTeacher ? <TeacherContextFilters overview={overview} /> : <DashboardFilters overview={overview} />}</div>
+      {!isTeacher ? (
+        <p className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${overview.scope === "TEACHER_FILTERED" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-blue-200 bg-blue-50 text-blue-900"}`} role="status">
+          {overview.scopeLabel}
+        </p>
+      ) : null}
 
       {isTeacher ? (
         <>
           <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
             <NextClassCard nextClass={overview.nextClass} liveSession={overview.liveSession} localDate={overview.localDate} />
-            <DashboardCard title="งานที่ต้องดำเนินการ" description="เรียงตามความเร่งด่วนในชั้นเรียนที่ได้รับมอบหมาย"><ActionRequiredList actions={overview.actions} /></DashboardCard>
-          </div>
-          <div className="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-            <DashboardCard title="การเข้าเรียนวันนี้" description="นับเฉพาะคาบที่ถึงเวลาในชั้นเรียนที่ได้รับมอบหมาย"><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
             <TodaySchedule today={overview.today} />
           </div>
+          <div className="mt-6"><DashboardStatGrid overview={overview} /></div>
           <div className="mt-6 grid gap-6 xl:grid-cols-2">
-            <DashboardCard title="แนวโน้ม 7 วัน" description={`ใช้เขตเวลาโรงเรียน ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard>
-            <DashboardCard title="เปรียบเทียบชั้นเรียนที่รับผิดชอบ" description="ชั้นเรียนและวิชาเดียวกันจะไม่ถูกรวมข้ามห้อง"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
+            <DashboardCard title="การเข้าเรียนวันนี้" description="เฉพาะคาบและชั้นเรียนในบริบทการสอนของคุณ"><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
+            <DashboardCard title="เปรียบเทียบชั้นเรียนของฉัน" description="แต่ละชั้นเรียนและรายวิชาแสดงแยกกัน"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
           </div>
+          <div className="mt-6"><DashboardCard title="งานที่ต้องดำเนินการ" description="เรียงตามความเร่งด่วนในชั้นเรียนของคุณ"><ActionRequiredList actions={overview.actions} /></DashboardCard></div>
+          <div className="mt-6"><DashboardCard title="แนวโน้มส่วนตัว 7 วัน" description={`ใช้เขตเวลาโรงเรียน ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard></div>
         </>
       ) : (
         <>
+          <div className="mt-6"><DashboardStatGrid overview={overview} /></div>
           <div className="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-            <DashboardCard title="การเข้าเรียนทั้งโรงเรียนวันนี้" description="ภาพรวมทั้งโรงเรียนตามตัวกรองที่เลือก"><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
-            <DashboardCard title={`แนวโน้ม ${overview.days} วัน`} description={`ข้อมูลทั้งโรงเรียน · เขตเวลา ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard>
+            <DashboardCard title={overview.scope === "SCHOOL" ? "การเข้าเรียนทั้งโรงเรียนวันนี้" : "การเข้าเรียนตามครูที่เลือก"} description={overview.scopeLabel}><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
+            <DashboardCard title={`แนวโน้ม ${overview.days} วัน`} description={`${overview.scopeLabel} · เขตเวลา ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard>
           </div>
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <DashboardCard title="เปรียบเทียบรายชั้นเรียน" description="แยกชั้นเรียน วิชา และผู้สอนด้วยรหัสจริง"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
-            <DashboardCard title="สถานะคาบวันนี้" description="ข้อมูลปฏิบัติการทั้งโรงเรียนตามขอบเขตที่เลือก"><SessionStatusChart totals={overview.sessionStatus} /></DashboardCard>
+            <DashboardCard title="เปรียบเทียบรายชั้นเรียน" description="แยกชั้นเรียน วิชา และผู้สอนด้วยบริบทงานสอน"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
+            <DashboardCard title="สถานะคาบวันนี้" description={overview.scopeLabel}><SessionStatusChart totals={overview.sessionStatus} /></DashboardCard>
           </div>
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <DashboardCard title="งานที่ต้องดำเนินการ" description="คาบและการเข้าเรียนที่ควรตรวจสอบ"><ActionRequiredList actions={overview.actions} /></DashboardCard>

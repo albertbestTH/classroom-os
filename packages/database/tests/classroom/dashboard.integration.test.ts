@@ -36,7 +36,8 @@ describe("dashboard analytics", () => {
       { schoolId: tenant.school.id, termId: tenant.term.id, classroomId: classroomB.id, studentId: studentB.id },
     ] });
 
-    const otherTeacher = await prisma.teacher.create({ data: { schoolId: tenant.school.id, employeeCode: `C-${randomUUID()}`, firstName: "Synthetic", lastName: "Unassigned" } });
+    const otherTeacherUser = await prisma.user.create({ data: { schoolId: tenant.school.id, email: `teacher-c+${randomUUID()}@example.invalid`, firstName: "Synthetic", lastName: "Unassigned", role: "TEACHER" } });
+    const otherTeacher = await prisma.teacher.create({ data: { schoolId: tenant.school.id, userId: otherTeacherUser.id, employeeCode: `C-${randomUUID()}`, firstName: "Synthetic", lastName: "Unassigned" } });
     const classroomC = await prisma.classroom.create({ data: { schoolId: tenant.school.id, code: `C-${randomUUID()}`, name: "Synthetic Classroom C", gradeLevel: "TEST-5" } });
     const studentC = await prisma.student.create({ data: { schoolId: tenant.school.id, studentNumber: `C-${randomUUID()}`, firstName: "Synthetic", lastName: "Excluded" } });
     const assignmentC = await prisma.teachingAssignment.create({ data: { schoolId: tenant.school.id, termId: tenant.term.id, teacherId: otherTeacher.id, classroomId: classroomC.id, subjectId: tenant.subject.id } });
@@ -58,7 +59,15 @@ describe("dashboard analytics", () => {
     const teacherAuth: TrustedAuthContext = { userId: tenant.user.id, schoolId: tenant.school.id, role: "TEACHER", teacherId: tenant.teacher.id };
     const now = new Date("2026-07-20T12:00:00.000Z");
     const teacher = await getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, now });
-    expect(teacher.scope).toBe("ASSIGNED_CLASSES");
+    expect(teacher.scope).toBe("TEACHER");
+    expect(teacher.viewerRole).toBe("TEACHER");
+    expect(teacher.selectedTeacher).toBeNull();
+    expect(teacher.availableTeachingContexts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ teachingAssignmentId: tenant.teachingAssignment.id, teacherId: tenant.teacher.id, classroomId: tenant.classroom.id, subjectId: tenant.subject.id }),
+      expect.objectContaining({ teachingAssignmentId: assignmentB.id, teacherId: tenant.teacher.id, classroomId: classroomB.id, subjectId: tenant.subject.id }),
+    ]));
+    expect(teacher.availableTeachingContexts).toHaveLength(2);
+    expect(teacher.availableTeachingContexts.some(({ classroomId }) => classroomId === classroomC.id)).toBe(false);
     expect(teacher.classrooms).toHaveLength(2);
     expect(new Set(teacher.classrooms.map(({ classroomId }) => classroomId))).toEqual(new Set([tenant.classroom.id, classroomB.id]));
     expect(teacher.classrooms.find(({ classroomId }) => classroomId === tenant.classroom.id)?.attendancePercentage).toBe(100);
@@ -72,9 +81,32 @@ describe("dashboard analytics", () => {
 
     const admin = await prisma.user.create({ data: { schoolId: tenant.school.id, email: `admin+${randomUUID()}@example.invalid`, firstName: "Synthetic", lastName: "Admin", role: "ADMIN" } });
     const manager = await getDashboardOverview({ schoolId: tenant.school.id, auth: { userId: admin.id, schoolId: tenant.school.id, role: "ADMIN", teacherId: null }, filters: { days: 30 }, now });
-    expect(manager.scope).toBe("SCHOOL_WIDE");
-    expect(manager.scopeLabel).toContain("ทั้งโรงเรียน");
+    expect(manager.scope).toBe("SCHOOL");
+    expect(manager.viewerRole).toBe("ADMIN");
+    expect(manager.scopeLabel).toBe("ภาพรวมทั้งโรงเรียน");
+    expect(manager.selectedTeacher).toBeNull();
+    expect(manager.filters.termId).toBe(tenant.term.id);
+    expect(manager.filterOptions.terms).toContainEqual({ id: tenant.term.id, label: tenant.term.name });
     expect(new Set(manager.classrooms.map(({ classroomId }) => classroomId))).toEqual(new Set([tenant.classroom.id, classroomB.id, classroomC.id]));
+
+    const teacherFiltered = await getDashboardOverview({
+      schoolId: tenant.school.id,
+      auth: { userId: admin.id, schoolId: tenant.school.id, role: "ADMIN", teacherId: null },
+      filters: { teacherId: otherTeacher.id },
+      now,
+    });
+    expect(teacherFiltered.scope).toBe("TEACHER_FILTERED");
+    expect(teacherFiltered.scopeLabel).toBe("กำลังดูข้อมูลของครู: Synthetic Unassigned");
+    expect(teacherFiltered.selectedTeacher).toEqual({ id: otherTeacher.id, label: "Synthetic Unassigned" });
+    expect(teacherFiltered.classrooms.map(({ classroomId }) => classroomId)).toEqual([classroomC.id]);
+    await expect(getDashboardOverview({
+      schoolId: tenant.school.id,
+      auth: { userId: admin.id, schoolId: tenant.school.id, role: "ADMIN", teacherId: null },
+      filters: { teacherId: otherTeacher.id, classroomId: tenant.classroom.id },
+      now,
+    })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, filters: { teacherId: otherTeacher.id }, now })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, filters: { classroomId: classroomC.id }, now })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     const foreign = await createSyntheticTenant(prisma, schoolIds, "foreign-dashboard");
     expect(teacher.classrooms.some(({ classroomId }) => classroomId === foreign.classroom.id)).toBe(false);
@@ -85,6 +117,7 @@ describe("dashboard analytics", () => {
     const tenant = await createSyntheticTenant(prisma, schoolIds, "dashboard-filters");
     const auth: TrustedAuthContext = { userId: tenant.user.id, schoolId: tenant.school.id, role: "TEACHER", teacherId: tenant.teacher.id };
     await expect(getDashboardOverview({ schoolId: tenant.school.id, auth, filters: { days: 30 } })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(getDashboardOverview({ schoolId: tenant.school.id, auth, filters: { termId: tenant.term.id } })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(getDashboardOverview({ schoolId: tenant.school.id, auth, filters: { classroomId: "bad-id" } })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });
