@@ -2,6 +2,10 @@
 
 Classroom OS is a mobile-first classroom management platform for teachers.
 
+## Product and engineering authority
+
+The [Classroom OS Product Bible](docs/product/classroom-os-product-bible.md) is the single source of truth for product direction, workspace responsibilities, architecture boundaries, UX, security, roadmap, and development decisions. Contributors and AI coding agents must read it before planning or implementing changes. Detailed architecture, data-model, and API documents remain authoritative within the boundaries assigned by the Product Bible.
+
 ## Principles
 - Mobile: simple, fast, and usable during class.
 - Web: complete classroom and student management.

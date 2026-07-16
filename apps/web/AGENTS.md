@@ -1,3 +1,5 @@
+Read the repository [Classroom OS Product Bible](../../docs/product/classroom-os-product-bible.md) before planning or changing the web application. Its workspace, UX, security, and product decisions are authoritative.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
