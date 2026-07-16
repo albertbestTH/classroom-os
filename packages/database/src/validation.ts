@@ -217,6 +217,12 @@ export const attendanceReportFiltersSchema = z
     message: "to must be on or after from.",
   });
 
+export const dashboardOverviewFiltersSchema = z.object({
+  days: z.union([z.literal(7), z.literal(30)]).optional(),
+  classroomId: uuid("classroomId").optional(),
+  teacherId: uuid("teacherId").optional(),
+});
+
 export const createAssessmentSchema = z.object({
   ...tenantFields,
   termId: uuid("termId"),

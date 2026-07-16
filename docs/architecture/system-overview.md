@@ -93,3 +93,13 @@ Attendance correction and cancellation are commands, not generic updates. Correc
 The dashboard derives missed, cancelled, live, completed, and incomplete-attendance counts from the same tenant-scoped session data. Re-entering a live session is a read of the canonical live row rather than a reverse lifecycle transition.
 
 CI runs service, route, component, and Playwright tests against an ephemeral PostgreSQL 16 service. The E2E global setup calls the guarded synthetic bootstrap; teardown removes only its operational session data. Browser state never supplies tenant, actor, role, or teacher identity.
+
+## Dashboard analytics boundary
+
+`dashboard.service` composes the tenant-scoped attendance-report and today services; it does not expose or pass Prisma records to the web application. The authenticated session is the only source of school, role, and teacher identity. Teacher requests are forcibly limited to their linked teacher profile and exact assignments. Manager responses are explicitly labeled school-wide and may apply validated 7/30-day, classroom, or teacher filters.
+
+Attendance comparisons group by stable classroom and subject IDs. This keeps classroom A and B separate even when both teach the same subject or share a display name. Repeated-absence alerts inherit the same assignment scope, and all dashboard links lead back to routes that independently reauthorize their session or classroom context. Cross-school rows cannot enter the source reports.
+
+Trend dates are created in `School.timezone`. A date with no qualifying operational session has a nullable percentage and is rendered as a gap, not a fabricated zero. Today's attendance is `(present + late) / eligible rows`; completion is `recorded / eligible rows`. Cancelled sessions are excluded from attendance, while live, completed, missed, scheduled, cancelled, and incomplete states remain visible in the operational status summary.
+
+The App Router page performs authenticated service reads on the server. Recharts is confined to small client visualization components that receive serializable contracts. Each figure has a visible legend or value list, a text summary, and explicit empty behavior; route loading and error boundaries provide skeleton and retry states without exposing internal failures.

@@ -601,6 +601,108 @@ export interface AttendanceSessionReportResult {
   }>;
 }
 
+export interface DashboardOverviewFilters {
+  days?: 7 | 30;
+  classroomId?: string;
+  teacherId?: string;
+}
+
+export interface DashboardAttendanceSummary {
+  totals: AttendanceStatusTotals;
+  attendedCount: number;
+  eligibleCount: number;
+  recordedCount: number;
+  attendancePercentage: number;
+  completionPercentage: number;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  attendedCount: number;
+  eligibleCount: number;
+  percentage: number | null;
+  hasSessions: boolean;
+}
+
+export interface DashboardClassroomComparison {
+  classroomId: string;
+  classroomName: string;
+  subjectId: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  attendedCount: number;
+  eligibleCount: number;
+  attendancePercentage: number | null;
+}
+
+export interface DashboardSessionStatusTotals {
+  scheduled: number;
+  live: number;
+  completed: number;
+  cancelled: number;
+  missed: number;
+  attendanceIncomplete: number;
+}
+
+export type DashboardActionType =
+  | "LIVE_SESSION"
+  | "INCOMPLETE_ATTENDANCE"
+  | "MISSED_CLASS"
+  | "REPEATED_ABSENCE"
+  | "TIMETABLE_CONFLICT"
+  | "CANCELLED_SESSION";
+
+export interface DashboardActionItem {
+  id: string;
+  type: DashboardActionType;
+  priority: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  href: string;
+  classroomId: string | null;
+  subjectId: string | null;
+}
+
+export interface DashboardRepeatedAbsence {
+  studentId: string;
+  studentName: string;
+  classroomId: string;
+  classroomName: string;
+  subjectId: string;
+  subjectName: string;
+  absenceCount: number;
+}
+
+export interface DashboardFilterOption {
+  id: string;
+  label: string;
+}
+
+export interface DashboardOverviewResult {
+  scope: "ASSIGNED_CLASSES" | "SCHOOL_WIDE";
+  scopeLabel: string;
+  timezone: string;
+  localDate: string;
+  from: string;
+  to: string;
+  days: 7 | 30;
+  filters: DashboardOverviewFilters;
+  attendance: DashboardAttendanceSummary;
+  sessionStatus: DashboardSessionStatusTotals;
+  trend: DashboardTrendPoint[];
+  classrooms: DashboardClassroomComparison[];
+  nextClass: TodayClassResult | null;
+  liveSession: TodayClassResult | null;
+  today: TodayTimetableResult;
+  actions: DashboardActionItem[];
+  repeatedAbsences: DashboardRepeatedAbsence[];
+  filterOptions: {
+    classrooms: DashboardFilterOption[];
+    teachers: DashboardFilterOption[];
+  };
+}
+
 export interface AssessmentResult {
   id: string;
   schoolId: string;

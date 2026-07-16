@@ -99,3 +99,9 @@ The authenticated dashboard and `/timetable` now use real tenant-scoped data. Ti
 Start, end, attendance-save, and daily materialization retries are idempotent where the intended result already exists. The UI preserves unsaved attendance selections in session storage and warns before leaving. Scheduled sessions may be cancelled with a reason; cancelling a live session is manager-only. Neither completed nor cancelled sessions can be reopened. Owner/admin users may correct an existing completed-session attendance row only with a reason; every correction stores immutable before/after values, adds a timeline event, and writes a separate sanitized audit entry.
 
 Run the synthetic browser suite with `pnpm e2e`. It covers teacher login, start/resume, attendance changes, save, end and summary, manager reporting, exact assignment isolation, and an unauthorized admin route. No production or real student data is used.
+
+## Dashboard analytics
+
+The authenticated dashboard combines the existing start/resume and today-schedule actions with tenant-safe attendance analytics. Teachers receive only their exact teaching assignments; each classroom and subject remains a separate comparison row even when names or subjects match. Owners and admins receive an explicitly labeled school-wide view with optional 7/30-day, classroom, and teacher filters.
+
+Today's attendance percentage is `(present + late) / eligible attendance rows`. Completion percentage is `recorded rows / eligible rows`. Trend points use `School.timezone`; a day without a qualifying session is represented as no data, never as invented 0% attendance. Donut, line, comparison, and session-status visualizations include visible values, text summaries, empty states, keyboard-visible links, and labels that do not depend on color alone.

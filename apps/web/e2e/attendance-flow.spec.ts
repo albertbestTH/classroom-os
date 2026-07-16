@@ -7,7 +7,15 @@ async function login(page: Page, email: string) {
   await page.getByLabel("อีเมล").fill(email);
   await page.getByLabel("รหัสผ่าน").fill(password);
   await page.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+}
+
+function captureConsoleErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  return errors;
 }
 
 test.describe.serial("attendance workflow", () => {
@@ -39,13 +47,30 @@ test.describe.serial("attendance workflow", () => {
     await expect(page.getByRole("heading", { name: /Synthetic Mathematics/ })).toBeVisible();
   });
 
+  test("teacher dashboard shows assigned analytics without console errors", async ({ page }) => {
+    const consoleErrors = captureConsoleErrors(page);
+    await page.context().clearCookies();
+    await login(page, "teacher@synthetic.classroom.test");
+    await expect(page.getByRole("heading", { name: "การเข้าเรียนวันนี้" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "แนวโน้ม 7 วัน" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "เปรียบเทียบชั้นเรียนที่รับผิดชอบ" })).toBeVisible();
+    await expect(page.getByText("Synthetic Classroom A", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Synthetic Classroom C (unassigned)", { exact: true })).toHaveCount(0);
+    expect(consoleErrors).toEqual([]);
+  });
+
   test("administrator reviews the school report and CSV action", async ({ page }) => {
+    const consoleErrors = captureConsoleErrors(page);
     await page.context().clearCookies();
     await login(page, "admin@synthetic.classroom.test");
+    await expect(page.getByText("ภาพรวมทั้งโรงเรียน", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "การเข้าเรียนทั้งโรงเรียนวันนี้" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "สถานะคาบวันนี้" })).toBeVisible();
     await page.goto("/attendance");
     await expect(page.getByRole("heading", { name: "ภาพรวมการเช็กชื่อ" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Synthetic Classroom A", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "ส่งออก CSV" })).toHaveAttribute("href", /api\/reports\/attendance\/export/);
+    expect(consoleErrors).toEqual([]);
   });
 
   test("teacher cannot see unassigned classes or access an admin route", async ({ page }) => {

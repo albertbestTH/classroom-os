@@ -29,6 +29,7 @@ Authorization helpers are `requireAuthenticatedUser`, `requireRole`, `requireSch
 | Session | `materializeClassSession`, `startClassSession`, `endClassSession`, `cancelClassSession`, `getClassSession`, `listClassSessionTimeline` |
 | Attendance | `getSessionAttendanceRoster`, `updateAttendanceBatch`, `correctCompletedAttendance` |
 | Attendance report | `getAttendanceReport`, `getAttendanceStudentReport`, `getAttendanceSessionReport`, `createAttendanceReportCsv` |
+| Dashboard | `getDashboardOverview` |
 | Assessment | `createAssessment`, `updateScoreBatch` |
 
 Every method requires `schoolId`. At the server boundary, `trustedTenantInput` derives both `schoolId` and `actorUserId` from the session. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
@@ -63,6 +64,7 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `GET|PUT /api/sessions/:id/attendance`; `POST /api/sessions/:id/attendance/corrections`
 - `POST /api/sessions/:id/cancel`
 - `GET /api/reports/attendance`; `GET /students/:id`; `GET /sessions/:id`; `GET /export`
+- `GET /api/dashboard/overview`
 - `POST /api/assessments`; `PUT /api/assessments/:id/scores`
 - `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
 - `GET|POST /api/staff/:id/teaching-assignments`; `GET /api/teaching-assignments`
@@ -93,5 +95,11 @@ Creating or marking an academic year current clears the prior current year and a
 - `GET /api/sessions/:id/timeline` returns only sanitized classroom events.
 
 Attendance report endpoints default to the current term and its date range. Teachers are forcibly scoped to their exact assignments; managers may filter school-wide by classroom, subject, teacher, term, and date. Student and session detail endpoints independently reauthorize their target. CSV export is the intentional non-JSON response: it is `no-store`, UTF-8 BOM encoded, formula-injection escaped, and uses a safe fixed-pattern filename.
+
+## Dashboard overview contract
+
+`GET /api/dashboard/overview` derives `schoolId`, role, and teacher identity exclusively from the authenticated session. Accepted query filters are `days=7|30`, `classroomId`, and `teacherId`; unknown, malformed, or trusted-context parameters are rejected. Teachers are fixed to seven days and their authenticated teacher profile. Owners/admins may select 7 or 30 days and explicitly filter the school-wide view.
+
+The result contains today's attendance and completion totals, operational session statuses, school-timezone trend points, classroom/subject comparison rows, next/live classes, repeated-absence alerts, prioritized actions, and safe filter labels. Attendance is `(present + late) / eligible rows`; completion is `recorded / eligible rows`. Trend points use `percentage: null` when no qualifying session exists, so no-session days are not represented as zero attendance. Classroom comparison keys use classroom and subject IDs, never display labels, preventing same-name or same-subject classrooms from merging.
 
 Materialization, start/end, timetable changes, and attendance changes are audited transactionally. Timeline events are additionally written for teacher-visible session activity. Neither response surface exposes Prisma records, stack traces, tokens, passwords, attendance notes in timeline metadata, or cross-tenant existence information.

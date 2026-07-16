@@ -31,6 +31,7 @@ type ReportInput = {
   schoolId: string;
   auth: TrustedAuthContext;
   filters?: AttendanceReportFilters;
+  now?: Date;
 };
 
 const emptyTotals = (): AttendanceStatusTotals => ({
@@ -114,7 +115,7 @@ async function buildAttendanceReport(
   const enrollmentMap = enrollmentsByClassroom(data.enrollments);
   const totals = emptyTotals();
   const studentRows = new Map<string, AttendanceReportStudentRow>();
-  const now = new Date();
+  const now = input.now ?? new Date();
   const sessions: AttendanceReportSessionRow[] = data.sessions.map((session) => {
     const expected = enrollmentMap.get(session.classroomId) ?? [];
     const records = new Map(session.attendanceRecords.map((record) => [record.studentId, record]));

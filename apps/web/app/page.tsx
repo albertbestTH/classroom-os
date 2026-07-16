@@ -1,54 +1,94 @@
-import { getTodayTimetable } from "@classroom-os/database";
+import { getDashboardOverview } from "@classroom-os/database";
 
 import { AppShell } from "@/components/app-shell";
-import { StartClassButton } from "@/components/classroom/start-class-button";
 import { TodaySchedule } from "@/components/classroom/today-schedule";
+import { ActionRequiredList } from "@/components/dashboard/action-required-list";
+import { AttendanceDonutChart } from "@/components/dashboard/attendance-donut-chart";
+import { AttendanceTrendChart } from "@/components/dashboard/attendance-trend-chart";
+import { ClassroomComparisonChart } from "@/components/dashboard/classroom-comparison-chart";
+import { DashboardCard } from "@/components/dashboard/dashboard-card";
+import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
+import { NextClassCard } from "@/components/dashboard/next-class-card";
+import { SessionStatusChart } from "@/components/dashboard/session-status-chart";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { requireWebSession } from "@/lib/auth";
+import { dashboardFiltersFromSearchParams } from "@/lib/dashboard";
 
-export default async function DashboardPage() {
-  const { context, user } = await requireWebSession();
-  const today = await getTodayTimetable({
+type DashboardPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function toUrlSearchParams(values: Record<string, string | string[] | undefined>) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (Array.isArray(value)) value.forEach((item) => params.append(key, item));
+    else if (value !== undefined) params.set(key, value);
+  }
+  return params;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const [{ context, user }, query] = await Promise.all([requireWebSession(), searchParams]);
+  const overview = await getDashboardOverview({
     schoolId: context.schoolId,
-    role: context.role,
-    teacherId: context.teacherId,
+    auth: context,
+    filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)),
   });
+  const isTeacher = context.role === "TEACHER";
   const dateLabel = new Intl.DateTimeFormat("th-TH", {
     dateStyle: "full",
-    timeZone: today.timezone,
+    timeZone: overview.timezone,
   }).format(new Date());
 
   return (
     <AppShell>
       <PageHeader
-        eyebrow={dateLabel}
+        eyebrow={`${dateLabel} · ${overview.scopeLabel}`}
         title={`สวัสดีครับ ${user.firstName}`}
-        description={context.role === "TEACHER" ? "คาบเรียนและงานที่ต้องจัดการวันนี้" : "ภาพรวมการสอนของโรงเรียนวันนี้"}
-        action={today.nextClass ? <StartClassButton item={today.nextClass} localDate={today.localDate} compact /> : undefined}
+        description={isTeacher ? "คาบเรียน การเช็กชื่อ และสิ่งที่ต้องจัดการสำหรับชั้นเรียนที่คุณได้รับมอบหมาย" : "ข้อมูลทั้งโรงเรียนจะแสดงอย่างชัดเจนและแยกตามชั้นเรียนกับรายวิชา"}
       />
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="สถิติวันนี้">
-        <StatCard label="คาบเรียนวันนี้" value={String(today.classes.length)} detail={today.currentTerm ? `${today.currentTerm.name} · ${today.currentTerm.academicYearName}` : "ยังไม่ได้กำหนดภาคเรียนปัจจุบัน"} />
-        <StatCard label="สอนเสร็จแล้ว" value={String(today.completedCount)} detail={`เช็กชื่อไม่ครบ ${today.incompleteAttendanceCount} คาบ`} />
-        <StatCard label="กำลังสอน" value={String(today.classes.filter((item) => item.status === "live").length)} detail="กลับเข้าสู่คาบได้ทันที" />
-        <StatCard label="ต้องติดตาม" value={String(today.missedCount + today.cancelledCount)} detail={`เลยเวลา ${today.missedCount} · ยกเลิก ${today.cancelledCount}`} />
+
+      {!isTeacher ? <div className="mt-6"><DashboardFilters overview={overview} /></div> : null}
+
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="ตัวเลขสำคัญวันนี้">
+        <StatCard label="อัตราเข้าเรียนวันนี้" value={`${overview.attendance.attendancePercentage}%`} detail={`มาเรียนหรือมาสาย ${overview.attendance.attendedCount}/${overview.attendance.eligibleCount} รายการ`} />
+        <StatCard label="บันทึกการเข้าเรียนครบ" value={`${overview.attendance.completionPercentage}%`} detail={`บันทึกแล้ว ${overview.attendance.recordedCount}/${overview.attendance.eligibleCount} รายการ`} />
+        <StatCard label="คาบกำลังสอน" value={String(overview.sessionStatus.live)} detail={`เสร็จแล้ว ${overview.sessionStatus.completed} · รอเริ่ม ${overview.sessionStatus.scheduled}`} />
+        <StatCard label="ต้องติดตาม" value={String(overview.actions.length)} detail={`เลยเวลา ${overview.sessionStatus.missed} · เช็กชื่อไม่ครบ ${overview.sessionStatus.attendanceIncomplete}`} />
       </section>
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <TodaySchedule today={today} />
-        <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm sm:p-6" aria-labelledby="next-class-heading">
-          <h2 id="next-class-heading" className="text-xl font-bold">คาบถัดไป</h2>
-          {today.nextClass ? (
-            <div className="mt-5">
-              <p className="text-2xl font-bold">{today.nextClass.timetableEntry.subjectName}</p>
-              <p className="mt-2 text-[#6B7280]">{today.nextClass.timetableEntry.classroomName}</p>
-              <p className="mt-1 text-sm text-[#6B7280]">{today.nextClass.timetableEntry.startTime}–{today.nextClass.timetableEntry.endTime} · ห้อง {today.nextClass.timetableEntry.room ?? "—"}</p>
-              <div className="mt-6"><StartClassButton item={today.nextClass} localDate={today.localDate} /></div>
-            </div>
-          ) : (
-            <p className="mt-5 rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-[#6B7280]">ไม่มีคาบที่ต้องเริ่มต่อในวันนี้</p>
-          )}
-        </section>
-      </div>
+
+      {isTeacher ? (
+        <>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <NextClassCard nextClass={overview.nextClass} liveSession={overview.liveSession} localDate={overview.localDate} />
+            <DashboardCard title="งานที่ต้องดำเนินการ" description="เรียงตามความเร่งด่วนในชั้นเรียนที่ได้รับมอบหมาย"><ActionRequiredList actions={overview.actions} /></DashboardCard>
+          </div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+            <DashboardCard title="การเข้าเรียนวันนี้" description="นับเฉพาะคาบที่ถึงเวลาในชั้นเรียนที่ได้รับมอบหมาย"><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
+            <TodaySchedule today={overview.today} />
+          </div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+            <DashboardCard title="แนวโน้ม 7 วัน" description={`ใช้เขตเวลาโรงเรียน ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard>
+            <DashboardCard title="เปรียบเทียบชั้นเรียนที่รับผิดชอบ" description="ชั้นเรียนและวิชาเดียวกันจะไม่ถูกรวมข้ามห้อง"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+            <DashboardCard title="การเข้าเรียนทั้งโรงเรียนวันนี้" description="ภาพรวมทั้งโรงเรียนตามตัวกรองที่เลือก"><AttendanceDonutChart {...overview.attendance} /></DashboardCard>
+            <DashboardCard title={`แนวโน้ม ${overview.days} วัน`} description={`ข้อมูลทั้งโรงเรียน · เขตเวลา ${overview.timezone}`}><AttendanceTrendChart points={overview.trend} /></DashboardCard>
+          </div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <DashboardCard title="เปรียบเทียบรายชั้นเรียน" description="แยกชั้นเรียน วิชา และผู้สอนด้วยรหัสจริง"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard>
+            <DashboardCard title="สถานะคาบวันนี้" description="ข้อมูลปฏิบัติการทั้งโรงเรียนตามขอบเขตที่เลือก"><SessionStatusChart totals={overview.sessionStatus} /></DashboardCard>
+          </div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <DashboardCard title="งานที่ต้องดำเนินการ" description="คาบและการเข้าเรียนที่ควรตรวจสอบ"><ActionRequiredList actions={overview.actions} /></DashboardCard>
+            <NextClassCard nextClass={overview.nextClass} liveSession={overview.liveSession} localDate={overview.localDate} />
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }
