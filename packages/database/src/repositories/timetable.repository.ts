@@ -14,8 +14,29 @@ import { requireTenantReferencesForSchool } from "./reference.repository.js";
 
 type TimetableClient = Pick<
   PrismaClient,
-  "timetableEntry" | "term" | "teacher" | "classroom" | "subject" | "user"
+  | "timetableEntry"
+  | "teachingAssignment"
+  | "term"
+  | "teacher"
+  | "classroom"
+  | "subject"
+  | "user"
 >;
+
+const timetableDetails = {
+  teachingAssignment: {
+    include: {
+      teacher: true,
+      classroom: true,
+      subject: true,
+      term: { include: { academicYear: true } },
+    },
+  },
+} satisfies Prisma.TimetableEntryInclude;
+
+export type TimetableEntryWithDetails = Prisma.TimetableEntryGetPayload<{
+  include: typeof timetableDetails;
+}>;
 
 export type TimetableWriteData = Pick<
   Prisma.TimetableEntryCreateManyInput,
@@ -42,10 +63,29 @@ export async function requireTimetableEntryForSchool(
   return entry;
 }
 
+export async function requireTimetableEntryDetailsForSchool(
+  client: TimetableClient,
+  input: TenantScope & { timetableEntryId: string },
+): Promise<TimetableEntryWithDetails> {
+  const schoolId = requireSchoolId(input);
+  const id = requireRecordId(input.timetableEntryId, "timetableEntryId");
+  const entry = await client.timetableEntry.findUnique({
+    where: { id, schoolId },
+    include: timetableDetails,
+  });
+  if (!entry) throw new TenantRecordNotFoundError("TimetableEntry");
+  return entry;
+}
+
 export async function listTimetableEntriesForSchool(
   client: TimetableClient,
-  input: TenantScope & { termId?: string; teacherId?: string; classroomId?: string },
-): Promise<TimetableEntry[]> {
+  input: TenantScope & {
+    termId?: string;
+    teacherId?: string;
+    classroomId?: string;
+    subjectId?: string;
+  },
+): Promise<TimetableEntryWithDetails[]> {
   const schoolId = requireSchoolId(input);
   return client.timetableEntry.findMany({
     where: {
@@ -53,9 +93,37 @@ export async function listTimetableEntriesForSchool(
       ...(input.termId ? { termId: input.termId } : {}),
       ...(input.teacherId ? { teacherId: input.teacherId } : {}),
       ...(input.classroomId ? { classroomId: input.classroomId } : {}),
+      ...(input.subjectId ? { subjectId: input.subjectId } : {}),
     },
+    include: timetableDetails,
     orderBy: [{ weekday: "asc" }, { startTime: "asc" }, { id: "asc" }],
   });
+}
+
+export async function requireMatchingTeachingAssignmentForSchool(
+  client: TimetableClient,
+  input: TenantScope & {
+    termId: string;
+    teacherId: string;
+    classroomId: string;
+    subjectId: string;
+  },
+): Promise<{ id: string }> {
+  const schoolId = requireSchoolId(input);
+  const assignment = await client.teachingAssignment.findUnique({
+    where: {
+      schoolId_termId_teacherId_classroomId_subjectId: {
+        schoolId,
+        termId: input.termId,
+        teacherId: input.teacherId,
+        classroomId: input.classroomId,
+        subjectId: input.subjectId,
+      },
+    },
+    select: { id: true },
+  });
+  if (!assignment) throw new TenantRecordNotFoundError("TeachingAssignment");
+  return assignment;
 }
 
 export async function findTimetableOverlapForSchool(
@@ -100,8 +168,17 @@ export async function createTimetableEntryForSchool(
     classroomId: input.data.classroomId,
     subjectId: input.data.subjectId,
   });
+  const assignment = await requireMatchingTeachingAssignmentForSchool(client, {
+    schoolId,
+    termId: input.data.termId,
+    teacherId: input.data.teacherId,
+    classroomId: input.data.classroomId,
+    subjectId: input.data.subjectId,
+  });
 
-  return client.timetableEntry.create({ data: { schoolId, ...input.data } });
+  return client.timetableEntry.create({
+    data: { schoolId, teachingAssignmentId: assignment.id, ...input.data },
+  });
 }
 
 export async function updateTimetableEntryForSchool(

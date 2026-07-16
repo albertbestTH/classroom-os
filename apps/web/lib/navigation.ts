@@ -15,6 +15,7 @@ const managerItems: NavigationItem[] = [
   { label: "ห้องเรียน", shortLabel: "ห้องเรียน", href: "/classrooms" },
   { label: "รายวิชา", shortLabel: "วิชา", href: "/subjects" },
   { label: "ตารางสอน", shortLabel: "ตารางสอน", href: "/timetable" },
+  { label: "Live Class", shortLabel: "Live", href: "/live" },
   { label: "สมุดคะแนน", shortLabel: "คะแนน", href: "/gradebook" },
   { label: "รายงาน", shortLabel: "รายงาน", href: "/reports" },
 ];
@@ -23,6 +24,7 @@ const teacherItems: NavigationItem[] = [
   dashboard,
   { label: "ชั้นเรียนของฉัน", shortLabel: "ชั้นเรียน", href: "/classrooms" },
   { label: "ตารางสอน", shortLabel: "ตารางสอน", href: "/timetable" },
+  { label: "Live Class", shortLabel: "Live", href: "/live" },
   { label: "เช็กชื่อ", shortLabel: "เช็กชื่อ", href: "/attendance" },
   { label: "สมุดคะแนน", shortLabel: "คะแนน", href: "/gradebook" },
 ];

@@ -7,16 +7,18 @@ import { NextRequest } from "next/server";
 
 import { requiredString, withAuthenticatedApi } from "@/lib/api";
 
-export async function POST(request: NextRequest) {
+type TimetableRouteContext = { params: Promise<{ id: string }> };
+
+export async function POST(request: NextRequest, route: TimetableRouteContext) {
   return withAuthenticatedApi(
     request,
     { mutation: true, json: true },
     async ({ context }, body = {}) => {
-      const timetableEntryId = requiredString(body, "timetableEntryId");
-      await requireTimetableEntryAccess(context, timetableEntryId);
+      const { id } = await route.params;
+      await requireTimetableEntryAccess(context, id);
       return materializeClassSession(
         trustedTenantInput(context, {
-          timetableEntryId,
+          timetableEntryId: id,
           localDate: requiredString(body, "localDate"),
         }),
       );

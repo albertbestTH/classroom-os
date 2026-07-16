@@ -41,6 +41,12 @@ enum AttendanceStatus {
   leave
 }
 
+enum SessionTimelineEventType {
+  SESSION_STARTED
+  ATTENDANCE_UPDATED
+  SESSION_ENDED
+}
+
 enum AssessmentType {
   quiz
   homework
@@ -59,23 +65,24 @@ model School {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  academicYears        AcademicYear[]
-  terms                Term[]
-  users                User[]
-  teachers             Teacher[]
-  students             Student[]
-  classrooms           Classroom[]
-  subjects             Subject[]
-  classEnrollments     ClassEnrollment[]
-  teachingAssignments  TeachingAssignment[]
-  timetableEntries     TimetableEntry[]
-  classSessions        ClassSession[]
-  attendanceRecords    AttendanceRecord[]
-  assessments          Assessment[]
-  scores               Score[]
-  auditLogs            AuditLog[]
-  authSessions         AuthSession[]
-  authenticationEvents AuthenticationEvent[]
+  academicYears         AcademicYear[]
+  terms                 Term[]
+  users                 User[]
+  teachers              Teacher[]
+  students              Student[]
+  classrooms            Classroom[]
+  subjects              Subject[]
+  classEnrollments      ClassEnrollment[]
+  teachingAssignments   TeachingAssignment[]
+  timetableEntries      TimetableEntry[]
+  classSessions         ClassSession[]
+  attendanceRecords     AttendanceRecord[]
+  assessments           Assessment[]
+  scores                Score[]
+  auditLogs             AuditLog[]
+  authSessions          AuthSession[]
+  authenticationEvents  AuthenticationEvent[]
+  sessionTimelineEvents SessionTimelineEvent[]
 
   @@index([isActive])
 }
@@ -135,12 +142,13 @@ model User {
   createdAt    DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
 
-  school                    School                @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  teacherProfile            Teacher?              @relation("TeacherUser")
-  recordedAttendanceRecords AttendanceRecord[]    @relation("AttendanceRecorder")
-  auditLogs                 AuditLog[]            @relation("AuditActor")
+  school                    School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  teacherProfile            Teacher?               @relation("TeacherUser")
+  recordedAttendanceRecords AttendanceRecord[]     @relation("AttendanceRecorder")
+  auditLogs                 AuditLog[]             @relation("AuditActor")
   authSessions              AuthSession[]
   authenticationEvents      AuthenticationEvent[]
+  sessionTimelineEvents     SessionTimelineEvent[] @relation("SessionTimelineActor")
 
   @@index([schoolId, role, status])
 }
@@ -301,11 +309,13 @@ model TeachingAssignment {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  school    School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  term      Term      @relation(fields: [termId], references: [id], onDelete: Restrict)
-  teacher   Teacher   @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  subject   Subject   @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term             Term             @relation(fields: [termId], references: [id], onDelete: Restrict)
+  teacher          Teacher          @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  classroom        Classroom        @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  subject          Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  timetableEntries TimetableEntry[]
+  classSessions    ClassSession[]
 
   @@unique([schoolId, termId, teacherId, classroomId, subjectId])
   @@index([schoolId, termId, teacherId])
@@ -313,66 +323,90 @@ model TeachingAssignment {
 }
 
 model TimetableEntry {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId    String   @db.Uuid
-  termId      String   @db.Uuid
-  teacherId   String   @db.Uuid
-  classroomId String   @db.Uuid
-  subjectId   String   @db.Uuid
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId             String   @db.Uuid
+  termId               String   @db.Uuid
+  teachingAssignmentId String   @db.Uuid
+  teacherId            String   @db.Uuid
+  classroomId          String   @db.Uuid
+  subjectId            String   @db.Uuid
   /// ISO weekday used by the MVP timetable: 1 (Monday) through 5 (Friday).
-  weekday     Int
+  weekday              Int
   /// Local wall-clock times interpreted using School.timezone.
-  startTime   DateTime @db.Time(0)
-  endTime     DateTime @db.Time(0)
-  room        String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  startTime            DateTime @db.Time(0)
+  endTime              DateTime @db.Time(0)
+  room                 String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
 
-  school        School         @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  term          Term           @relation(fields: [termId], references: [id], onDelete: Restrict)
-  teacher       Teacher        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  classroom     Classroom      @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  classSessions ClassSession[]
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term               Term               @relation(fields: [termId], references: [id], onDelete: Restrict)
+  teacher            Teacher            @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  classroom          Classroom          @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  subject            Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teachingAssignment TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
+  classSessions      ClassSession[]
 
   @@unique([schoolId, termId, weekday, startTime, classroomId])
   @@unique([schoolId, termId, weekday, startTime, teacherId])
   @@index([schoolId, termId, weekday, isActive])
+  @@index([schoolId, teachingAssignmentId, weekday])
   @@index([schoolId, teacherId, weekday])
   @@index([schoolId, classroomId, weekday])
 }
 
 model ClassSession {
-  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId         String        @db.Uuid
-  termId           String        @db.Uuid
-  timetableEntryId String?       @db.Uuid
-  teacherId        String        @db.Uuid
-  classroomId      String        @db.Uuid
-  subjectId        String        @db.Uuid
-  scheduledStart   DateTime      @db.Timestamptz(3)
-  scheduledEnd     DateTime      @db.Timestamptz(3)
-  startedAt        DateTime?     @db.Timestamptz(3)
-  endedAt          DateTime?     @db.Timestamptz(3)
-  status           SessionStatus @default(scheduled)
-  notes            String?
-  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId             String        @db.Uuid
+  termId               String        @db.Uuid
+  timetableEntryId     String?       @db.Uuid
+  teachingAssignmentId String        @db.Uuid
+  teacherId            String        @db.Uuid
+  classroomId          String        @db.Uuid
+  subjectId            String        @db.Uuid
+  scheduledStart       DateTime      @db.Timestamptz(3)
+  scheduledEnd         DateTime      @db.Timestamptz(3)
+  startedAt            DateTime?     @db.Timestamptz(3)
+  endedAt              DateTime?     @db.Timestamptz(3)
+  status               SessionStatus @default(scheduled)
+  notes                String?
+  createdAt            DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
 
-  school            School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  term              Term               @relation(fields: [termId], references: [id], onDelete: Restrict)
-  timetableEntry    TimetableEntry?    @relation(fields: [timetableEntryId], references: [id], onDelete: SetNull)
-  teacher           Teacher            @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  classroom         Classroom          @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  subject           Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  attendanceRecords AttendanceRecord[]
-  assessments       Assessment[]
+  school             School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term               Term                   @relation(fields: [termId], references: [id], onDelete: Restrict)
+  timetableEntry     TimetableEntry?        @relation(fields: [timetableEntryId], references: [id], onDelete: SetNull)
+  teachingAssignment TeachingAssignment     @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
+  teacher            Teacher                @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  classroom          Classroom              @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  subject            Subject                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  attendanceRecords  AttendanceRecord[]
+  assessments        Assessment[]
+  timelineEvents     SessionTimelineEvent[]
 
   @@unique([timetableEntryId, scheduledStart])
   @@index([schoolId, scheduledStart, status])
+  @@index([schoolId, teachingAssignmentId, scheduledStart])
   @@index([schoolId, teacherId, scheduledStart])
   @@index([schoolId, classroomId, scheduledStart])
+}
+
+model SessionTimelineEvent {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId       String                   @db.Uuid
+  classSessionId String                   @db.Uuid
+  actorUserId    String?                  @db.Uuid
+  eventType      SessionTimelineEventType
+  metadata       Json                     @default("{}")
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  classSession ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("SessionTimelineActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, classSessionId, createdAt])
+  @@index([schoolId, createdAt])
 }
 
 model AttendanceRecord {

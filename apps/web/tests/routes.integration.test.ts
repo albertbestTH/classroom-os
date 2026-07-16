@@ -13,6 +13,7 @@ import {
   PUT as putAttendance,
 } from "@/app/api/sessions/[id]/attendance/route";
 import { GET as getSession } from "@/app/api/sessions/[id]/route";
+import { POST as startSession } from "@/app/api/sessions/[id]/start/route";
 import { GET as getStaff } from "@/app/api/staff/route";
 import { GET as getStudents, POST as postStudent } from "@/app/api/students/route";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
@@ -102,12 +103,29 @@ describe("authenticated API routes", () => {
         gradeLevel: "TEST-5",
       },
     });
-    await prisma.teachingAssignment.create({
+    const assignmentB = await prisma.teachingAssignment.create({
       data: {
         schoolId: tenant.school.id,
         termId: tenant.term.id,
         teacherId: tenant.teacher.id,
         classroomId: classB.id,
+        subjectId: tenant.subject.id,
+      },
+    });
+    const otherTeacher = await prisma.teacher.create({
+      data: {
+        schoolId: tenant.school.id,
+        employeeCode: `OTHER-${randomUUID()}`,
+        firstName: "Other",
+        lastName: "Teacher",
+      },
+    });
+    const assignmentC = await prisma.teachingAssignment.create({
+      data: {
+        schoolId: tenant.school.id,
+        termId: tenant.term.id,
+        teacherId: otherTeacher.id,
+        classroomId: classC.id,
         subjectId: tenant.subject.id,
       },
     });
@@ -171,6 +189,12 @@ describe("authenticated API routes", () => {
           teacherId: tenant.teacher.id,
           classroomId,
           subjectId: tenant.subject.id,
+          teachingAssignmentId:
+            classroomId === tenant.classroom.id
+              ? tenant.teachingAssignment.id
+              : classroomId === classB.id
+                ? assignmentB.id
+                : assignmentC.id,
           scheduledStart: new Date(`2026-10-${day}T01:00:00.000Z`),
           scheduledEnd: new Date(`2026-10-${day}T01:50:00.000Z`),
         },
@@ -194,6 +218,16 @@ describe("authenticated API routes", () => {
       (await getSession(apiRequest(`/api/sessions/${sessionC.id}`, { token: login.token }), {
         params: Promise.resolve({ id: sessionC.id }),
       })).status,
+    ).toBe(403);
+    expect(
+      (await startSession(
+        apiRequest(`/api/sessions/${sessionC.id}/start`, {
+          token: login.token,
+          method: "POST",
+          json: {},
+        }),
+        { params: Promise.resolve({ id: sessionC.id }) },
+      )).status,
     ).toBe(403);
     expect(
       (await getSession(apiRequest(`/api/sessions/${otherTenant.school.id}`, { token: login.token }), {

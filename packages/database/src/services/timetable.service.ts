@@ -13,6 +13,8 @@ import {
   createTimetableEntryForSchool,
   findTimetableOverlapForSchool,
   listTimetableEntriesForSchool,
+  requireMatchingTeachingAssignmentForSchool,
+  requireTimetableEntryDetailsForSchool,
   requireTimetableEntryForSchool,
   updateTimetableEntryForSchool,
 } from "../repositories/timetable.repository.js";
@@ -76,7 +78,11 @@ export function createTimetableEntry(
         entityId: entry.id,
         metadata: { weekday: entry.weekday },
       });
-      return toTimetableEntryResult(entry);
+      const detailed = await requireTimetableEntryDetailsForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        timetableEntryId: entry.id,
+      });
+      return toTimetableEntryResult(detailed);
     });
   });
 }
@@ -110,6 +116,13 @@ export function updateTimetableEntry(
         classroomId,
         subjectId,
       });
+      const assignment = await requireMatchingTeachingAssignmentForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        termId: existing.termId,
+        teacherId,
+        classroomId,
+        subjectId,
+      });
 
       if (parsed.isActive ?? existing.isActive) {
         const overlap = await findTimetableOverlapForSchool(transaction, {
@@ -132,6 +145,7 @@ export function updateTimetableEntry(
           teacherId,
           classroomId,
           subjectId,
+          teachingAssignmentId: assignment.id,
           weekday,
           startTime,
           endTime,
@@ -147,7 +161,11 @@ export function updateTimetableEntry(
         entityId: entry.id,
         metadata: { fields: Object.keys(parsed).filter((key) => !["schoolId", "actorUserId"].includes(key)) },
       });
-      return toTimetableEntryResult(entry);
+      const detailed = await requireTimetableEntryDetailsForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        timetableEntryId: entry.id,
+      });
+      return toTimetableEntryResult(detailed);
     });
   });
 }
@@ -157,6 +175,7 @@ export function listTimetableEntries(
     termId?: string;
     teacherId?: string;
     classroomId?: string;
+    subjectId?: string;
   },
 ): Promise<TimetableEntryResult[]> {
   return executeTenantService(input, async () => {
@@ -169,7 +188,7 @@ export function getTimetableEntry(
   input: TenantServiceInput & { timetableEntryId: string },
 ): Promise<TimetableEntryResult> {
   return executeTenantService(input, async () => {
-    const entry = await requireTimetableEntryForSchool(getPrismaClient(), input);
+    const entry = await requireTimetableEntryDetailsForSchool(getPrismaClient(), input);
     return toTimetableEntryResult(entry);
   });
 }

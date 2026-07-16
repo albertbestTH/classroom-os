@@ -1,5 +1,6 @@
 import type {
   ClassSession,
+  Prisma,
   PrismaClient,
   SessionStatus,
 } from "../generated/prisma/client.js";
@@ -13,10 +14,32 @@ import {
 } from "../tenant.js";
 
 type SessionReadClient = Pick<PrismaClient, "classSession">;
+type SessionDetailsClient = Pick<PrismaClient, "classSession" | "classEnrollment">;
 type SessionWriteClient = Pick<
   PrismaClient,
-  "classSession" | "timetableEntry" | "term" | "teacher" | "classroom" | "subject"
+  | "classSession"
+  | "timetableEntry"
+  | "term"
+  | "teacher"
+  | "classroom"
+  | "subject"
 >;
+
+const sessionDetails = {
+  teachingAssignment: {
+    include: {
+      teacher: true,
+      classroom: true,
+      subject: true,
+      term: { include: { academicYear: true } },
+    },
+  },
+  _count: { select: { attendanceRecords: true } },
+} satisfies Prisma.ClassSessionInclude;
+
+export type ClassSessionWithDetails = Prisma.ClassSessionGetPayload<{
+  include: typeof sessionDetails;
+}> & { enrolledStudentCount: number };
 
 export type ListClassSessionsInput = TenantScope & {
   classroomId?: string;
@@ -59,6 +82,22 @@ export async function listClassSessionsForSchool(
   });
 }
 
+export function findLiveSessionForTeacherForSchool(
+  client: SessionReadClient,
+  input: TenantScope & { teacherId: string; excludeSessionId?: string },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.classSession.findFirst({
+    where: {
+      schoolId,
+      teacherId: input.teacherId,
+      status: "live",
+      ...(input.excludeSessionId ? { id: { not: input.excludeSessionId } } : {}),
+    },
+    select: { id: true },
+  });
+}
+
 export async function requireClassSessionForSchool(
   client: SessionReadClient,
   input: TenantScope & { sessionId: string },
@@ -72,6 +111,29 @@ export async function requireClassSessionForSchool(
   if (!session) throw new TenantRecordNotFoundError("ClassSession");
 
   return session;
+}
+
+export async function requireClassSessionDetailsForSchool(
+  client: SessionDetailsClient,
+  input: TenantScope & { sessionId: string },
+): Promise<ClassSessionWithDetails> {
+  const schoolId = requireSchoolId(input);
+  const sessionId = requireRecordId(input.sessionId, "sessionId");
+  const session = await client.classSession.findUnique({
+    where: { id: sessionId, schoolId },
+    include: sessionDetails,
+  });
+  if (!session) throw new TenantRecordNotFoundError("ClassSession");
+  const enrolledStudentCount = await client.classEnrollment.count({
+    where: {
+      schoolId,
+      termId: session.termId,
+      classroomId: session.classroomId,
+      isActive: true,
+      leftAt: null,
+    },
+  });
+  return { ...session, enrolledStudentCount };
 }
 
 export async function createSessionFromTimetableForSchool(
@@ -108,6 +170,7 @@ export async function createSessionFromTimetableInScopeForSchool(
       select: {
         id: true,
         termId: true,
+        teachingAssignmentId: true,
         teacherId: true,
         classroomId: true,
         subjectId: true,
@@ -144,6 +207,7 @@ export async function createSessionFromTimetableInScopeForSchool(
         schoolId,
         termId: timetableEntry.termId,
         timetableEntryId: timetableEntry.id,
+        teachingAssignmentId: timetableEntry.teachingAssignmentId,
         teacherId: timetableEntry.teacherId,
         classroomId: timetableEntry.classroomId,
         subjectId: timetableEntry.subjectId,

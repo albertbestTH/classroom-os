@@ -172,6 +172,14 @@ export const ATTENDANCE_STATUSES = [
 ] as const;
 export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
 
+export const SESSION_TIMELINE_EVENT_TYPES = [
+  "SESSION_STARTED",
+  "ATTENDANCE_UPDATED",
+  "SESSION_ENDED",
+] as const;
+export type SessionTimelineEventType =
+  (typeof SESSION_TIMELINE_EVENT_TYPES)[number];
+
 export const ASSESSMENT_TYPES = [
   "quiz",
   "homework",
@@ -259,6 +267,11 @@ export interface CreateClassSessionInput extends TenantServiceInput {
   scheduledStart: string;
   scheduledEnd: string;
   notes?: string | null;
+}
+
+export interface MaterializeClassSessionInput extends TenantServiceInput {
+  timetableEntryId: string;
+  localDate: string;
 }
 
 export interface StartClassSessionInput extends TenantServiceInput {
@@ -368,6 +381,7 @@ export interface TimetableEntryResult {
   id: string;
   schoolId: string;
   termId: string;
+  teachingAssignmentId: string;
   teacherId: string;
   classroomId: string;
   subjectId: string;
@@ -376,6 +390,12 @@ export interface TimetableEntryResult {
   endTime: string;
   room: string | null;
   isActive: boolean;
+  teacherName: string;
+  classroomName: string;
+  subjectCode: string;
+  subjectName: string;
+  termName: string;
+  academicYearName: string;
 }
 
 export interface ClassSessionResult {
@@ -383,6 +403,7 @@ export interface ClassSessionResult {
   schoolId: string;
   termId: string;
   timetableEntryId: string | null;
+  teachingAssignmentId: string;
   classroomId: string;
   subjectId: string;
   teacherId: string;
@@ -391,6 +412,14 @@ export interface ClassSessionResult {
   startedAt: string | null;
   endedAt: string | null;
   status: SessionStatus;
+  teacherName: string;
+  classroomName: string;
+  subjectCode: string;
+  subjectName: string;
+  termName: string;
+  academicYearName: string;
+  enrolledStudentCount: number;
+  attendanceRecordedCount: number;
 }
 
 export interface AttendanceRecordResult {
@@ -399,6 +428,56 @@ export interface AttendanceRecordResult {
   status: AttendanceStatus;
   note: string | null;
   recordedAt: string;
+}
+
+export interface SessionAttendanceStudentResult {
+  studentId: string;
+  studentNumber: string;
+  firstName: string;
+  lastName: string;
+  preferredName: string | null;
+  status: AttendanceStatus | null;
+  note: string | null;
+  recordedAt: string | null;
+}
+
+export interface SessionAttendanceResult {
+  sessionId: string;
+  classroomId: string;
+  status: SessionStatus;
+  students: SessionAttendanceStudentResult[];
+  recordedCount: number;
+  enrolledCount: number;
+}
+
+export interface SessionTimelineEventResult {
+  id: string;
+  classSessionId: string;
+  actorUserId: string | null;
+  eventType: SessionTimelineEventType;
+  metadata: Readonly<Record<string, unknown>>;
+  createdAt: string;
+}
+
+export type TodayClassStatus = "scheduled" | "live" | "completed" | "missed";
+
+export interface TodayClassResult {
+  timetableEntry: TimetableEntryResult;
+  session: ClassSessionResult | null;
+  status: TodayClassStatus;
+  scheduledStart: string;
+  scheduledEnd: string;
+}
+
+export interface TodayTimetableResult {
+  localDate: string;
+  timezone: string;
+  currentAcademicYear: AcademicYearResult | null;
+  currentTerm: TermResult | null;
+  classes: TodayClassResult[];
+  nextClass: TodayClassResult | null;
+  completedCount: number;
+  missedCount: number;
 }
 
 export interface AssessmentResult {

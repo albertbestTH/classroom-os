@@ -1,6 +1,6 @@
 import {
   domainError,
-  listAttendanceForSession,
+  getSessionAttendanceRoster,
   requireAttendanceAccess,
   trustedTenantInput,
   updateAttendanceBatch,
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, route: AttendanceRouteContext) {
       throw domainError("VALIDATION_ERROR", "classroomId is required.");
     }
     await requireAttendanceAccess(context, { sessionId: id, classroomId });
-    return listAttendanceForSession({ schoolId: context.schoolId, sessionId: id });
+    return getSessionAttendanceRoster({ schoolId: context.schoolId, sessionId: id });
   });
 }
 

@@ -171,3 +171,11 @@ Volume removal is deliberately not part of any package script.
 - No biometric or face-recognition data.
 - No parent or student application models.
 - No social login, password reset, parent/student identity, or biometric authentication.
+
+## Operational session services
+
+`materializeClassSession` accepts a scoped timetable entry and school-local date, validates its weekday and term, converts wall-clock times using `School.timezone`, and creates one scheduled session with immutable teaching-assignment lineage. `getTodayTimetable` returns current-year/current-term entries and dated status only for the caller's permitted teacher scope.
+
+`startClassSession` prevents a second live session for the teacher; `endClassSession` completes only a live session. Attendance roster reads join the session's exact term/classroom enrollment, and batch updates reject students from every other classroom. Completed sessions are read-only. These rules are service-enforced and supported by unique constraints, including the partial one-live-session-per-teacher index.
+
+`SessionTimelineEvent` is not an audit substitute. It provides sanitized teacher-facing events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `SESSION_ENDED`) for one class session. `AuditLog` remains the broader mutation/accountability history. Timeline metadata may contain timestamps and aggregate status counts only—never credentials, tokens, student notes, biometric data, or raw request bodies.

@@ -162,6 +162,23 @@ The current-period invariant is now also protected by the `enforce_current_acade
 
 Teaching-assignment administration intentionally treats `(termId, teacherId, classroomId, subjectId)` as the complete scope. A teacher can teach the same subject in multiple classrooms and can teach multiple subjects in one classroom. Admin screens display all four dimensions, so classroom A and classroom B are never visually or logically merged.
 
+## Timetable and Live Class lifecycle
+
+`TimetableEntry.teachingAssignmentId` is required and must match its denormalized term, teacher, classroom, and subject. Materialization copies that assignment and all four dimensions to `ClassSession`; the classroom context is therefore immutable through the live lifecycle. The same subject in classrooms A and B produces separate timetable rows, session rows, rosters, attendance records, and timelines.
+
+```mermaid
+stateDiagram-v2
+    [*] --> scheduled: materialize timetable date
+    scheduled --> live: start class
+    live --> completed: end class
+    scheduled --> cancelled: cancel (future)
+    completed --> [*]
+```
+
+Only `scheduled` may start and only `live` may end. A PostgreSQL partial unique index permits at most one `live` session per teacher, including concurrent requests. Completed sessions and their attendance are read-only. Attendance roster reads and writes join active `ClassEnrollment` by the session's exact term and classroom; student IDs from another classroom are rejected even when the teacher teaches both classrooms.
+
+Timeline events (`SESSION_STARTED`, `ATTENDANCE_UPDATED`, `SESSION_ENDED`) belong to one school and one class session and are indexed by session/time. Timeline metadata is deliberately limited to occurrence times and attendance counts. Audit logs separately capture the actor, action, entity, and safe mutation metadata for operational accountability.
+
 ## Runtime verification
 
 Vitest integration tests run against the disposable local PostgreSQL database. They create unique synthetic tenants, verify tenant-scoped repositories and database uniqueness constraints, and remove their own records in dependency order. A safety guard refuses non-local hosts and database names other than `classroom_os`.

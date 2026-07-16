@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   return withAuthenticatedApi(request, {}, async ({ context }) => {
     const classroomId = request.nextUrl.searchParams.get("classroomId") ?? undefined;
     const termId = request.nextUrl.searchParams.get("termId") ?? undefined;
+    const subjectId = request.nextUrl.searchParams.get("subjectId") ?? undefined;
     if (context.role === "TEACHER" && classroomId) {
       await requireClassroomAccess(context, { classroomId, termId });
     }
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       classroomId,
       termId,
       teacherId: context.role === "TEACHER" ? context.teacherId ?? undefined : undefined,
+      subjectId,
     });
   });
 }

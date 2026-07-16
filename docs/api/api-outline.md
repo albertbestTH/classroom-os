@@ -25,8 +25,9 @@ Authorization helpers are `requireAuthenticatedUser`, `requireRole`, `requireSch
 | Student | `createStudent`, `updateStudent`, `getStudent`, `listStudents` |
 | Classroom | `createClassroom`, `updateClassroom`, `getClassroom`, `listClassrooms` |
 | Timetable | `createTimetableEntry`, `updateTimetableEntry`, `listTimetableEntries` |
-| Session | `createClassSession`, `startClassSession`, `endClassSession`, `getClassSession` |
-| Attendance | `updateAttendanceBatch` |
+| Today | `getTodayTimetable` |
+| Session | `materializeClassSession`, `startClassSession`, `endClassSession`, `getClassSession`, `listClassSessionTimeline` |
+| Attendance | `getSessionAttendanceRoster`, `updateAttendanceBatch` |
 | Assessment | `createAssessment`, `updateScoreBatch` |
 
 Every method requires `schoolId`. At the server boundary, `trustedTenantInput` derives both `schoolId` and `actorUserId` from the session. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
@@ -57,7 +58,7 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `GET|POST /api/students`; `GET|PATCH /api/students/:id`
 - `GET|POST /api/classrooms`; `GET|PATCH /api/classrooms/:id`
 - `GET|POST /api/timetable`; `PATCH /api/timetable/:id`
-- `POST /api/sessions`; `GET /api/sessions/:id`; `POST /start`; `POST /end`
+- `POST /api/sessions` (compatibility materialization); `GET /api/sessions/:id`; `POST /start`; `POST /end`; `GET /timeline`
 - `GET|PUT /api/sessions/:id/attendance`
 - `POST /api/assessments`; `PUT /api/assessments/:id/scores`
 - `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
@@ -78,3 +79,14 @@ Staff directory responses include teacher-profile status and teaching-assignment
 Owner and admin users may list and mutate classrooms, subjects, years, and terms within their school. Admin users cannot create or modify `SCHOOL_OWNER` accounts; teachers receive `403` from admin collection APIs. Request fields such as `schoolId`, `actorUserId`, `teacherId`, and caller role remain non-authoritative and are replaced by the resolved session context.
 
 Creating or marking an academic year current clears the prior current year and any current term from another year. Creating or marking a term current clears the prior current term and marks its parent year current. Start dates must precede end dates, and term dates must fit inside the parent academic year.
+
+## Operational timetable and session routes
+
+- `GET /api/me/today` returns the visible current-term schedule, next class, completed/missed counts, and school timezone. Teachers receive only their own assignment rows.
+- `GET|POST /api/timetable` and `PATCH /api/timetable/:id` return display-safe assignment labels and enforce valid assignments plus teacher/classroom interval conflicts.
+- `POST /api/timetable/:id/materialize` accepts `{ "localDate": "YYYY-MM-DD" }`. It derives all trusted context from the timetable entry and rejects a second occurrence for that entry/date.
+- `GET /api/sessions/:id`, `POST /start`, and `POST /end` enforce exact assignment access and the `scheduled → live → completed` state machine.
+- `GET|PUT /api/sessions/:id/attendance` uses the canonical session classroom and only active enrolled students. PUT accepts a batch plus the matching `classroomId`; completed sessions reject mutations.
+- `GET /api/sessions/:id/timeline` returns only sanitized classroom events.
+
+Materialization, start/end, timetable changes, and attendance changes are audited transactionally. Timeline events are additionally written for teacher-visible session activity. Neither response surface exposes Prisma records, stack traces, tokens, passwords, attendance notes in timeline metadata, or cross-tenant existence information.

@@ -85,3 +85,9 @@ Navigation is derived from the trusted session role. Owners see school settings,
 Staff accounts are created with a one-time temporary password input that follows the existing password policy. The password is never returned or audited. Disabling an account requires an in-app confirmation and revokes active sessions transactionally. Teacher profiles and teaching assignments remain separate steps so one teacher can hold multiple classroom/subject assignments in the same term without merging classroom data.
 
 Subject, classroom, academic-year, and term mutations are tenant-scoped and audited. PostgreSQL partial unique indexes enforce at most one current academic year and one current term per school; service transactions also clear the previous current selection and keep a current term's academic year current.
+
+## Operational classroom workflow
+
+The authenticated dashboard and `/timetable` now use real tenant-scoped data. Timetable entries belong to the current term and retain the exact teaching assignment behind their school, year, term, teacher, classroom, and subject context. Teachers see only their assignments; owner/admin users can filter school-wide entries by teacher, classroom, or subject.
+
+`GET /api/me/today` interprets the current date in `School.timezone`. Starting a scheduled item materializes one dated session from its timetable entry, snapshots its assignment, and then transitions `scheduled → live`. A teacher may have only one live session. The `/live` and `/sessions/:id` screens provide the Live Class flow, manual roster attendance, confirmed session end, and a read-only summary. Session timeline entries are teacher-facing operational events; `AuditLog` remains the compliance record for every mutation.

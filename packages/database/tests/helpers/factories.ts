@@ -94,6 +94,7 @@ export async function createSyntheticTenant(
     data: {
       schoolId: school.id,
       termId: term.id,
+      teachingAssignmentId: teachingAssignment.id,
       teacherId: teacher.id,
       classroomId: classroom.id,
       subjectId: subject.id,

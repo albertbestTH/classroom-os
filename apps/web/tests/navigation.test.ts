@@ -5,7 +5,7 @@ import { navigationForRole } from "@/lib/navigation";
 describe("role-based navigation", () => {
   it("shows owner-only settings and all manager sections to school owners", () => {
     const items = navigationForRole("SCHOOL_OWNER");
-    expect(items.map(({ href }) => href)).toEqual(["/", "/students", "/staff", "/classrooms", "/subjects", "/timetable", "/gradebook", "/reports", "/settings"]);
+    expect(items.map(({ href }) => href)).toEqual(["/", "/students", "/staff", "/classrooms", "/subjects", "/timetable", "/live", "/gradebook", "/reports", "/settings"]);
   });
 
   it("omits owner settings for admins", () => {
@@ -15,6 +15,6 @@ describe("role-based navigation", () => {
   });
 
   it("shows only teacher work routes to teachers", () => {
-    expect(navigationForRole("TEACHER").map(({ href }) => href)).toEqual(["/", "/classrooms", "/timetable", "/attendance", "/gradebook"]);
+    expect(navigationForRole("TEACHER").map(({ href }) => href)).toEqual(["/", "/classrooms", "/timetable", "/live", "/attendance", "/gradebook"]);
   });
 });

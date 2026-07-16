@@ -120,3 +120,29 @@ export async function listAttendanceForSessionForSchool(
     orderBy: [{ studentId: "asc" }],
   });
 }
+
+export async function listAttendanceRosterForSchool(
+  client: AttendanceClient,
+  input: TenantScope & { sessionId: string },
+) {
+  const schoolId = requireSchoolId(input);
+  const session = await requireAttendanceSessionForSchool(client, input);
+  const [enrollments, records] = await Promise.all([
+    client.classEnrollment.findMany({
+      where: {
+        schoolId,
+        termId: session.termId,
+        classroomId: session.classroomId,
+        isActive: true,
+        leftAt: null,
+        student: { isActive: true },
+      },
+      include: { student: true },
+      orderBy: [{ student: { studentNumber: "asc" } }],
+    }),
+    client.attendanceRecord.findMany({
+      where: { schoolId, classSessionId: session.id },
+    }),
+  ]);
+  return { session, enrollments, records };
+}

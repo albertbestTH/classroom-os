@@ -195,12 +195,29 @@ describe("authentication and teacher authorization", () => {
     const classC = await prisma.classroom.create({
       data: { schoolId: tenant.school.id, code: `C-${tenant.school.id}`, name: "Synthetic C", gradeLevel: "TEST-5" },
     });
-    await prisma.teachingAssignment.create({
+    const assignmentB = await prisma.teachingAssignment.create({
       data: {
         schoolId: tenant.school.id,
         termId: tenant.term.id,
         teacherId: tenant.teacher.id,
         classroomId: classB.id,
+        subjectId: tenant.subject.id,
+      },
+    });
+    const otherTeacher = await prisma.teacher.create({
+      data: {
+        schoolId: tenant.school.id,
+        employeeCode: `OTHER-${tenant.school.id}`,
+        firstName: "Other",
+        lastName: "Teacher",
+      },
+    });
+    const assignmentC = await prisma.teachingAssignment.create({
+      data: {
+        schoolId: tenant.school.id,
+        termId: tenant.term.id,
+        teacherId: otherTeacher.id,
+        classroomId: classC.id,
         subjectId: tenant.subject.id,
       },
     });
@@ -233,6 +250,12 @@ describe("authentication and teacher authorization", () => {
           teacherId: tenant.teacher.id,
           classroomId,
           subjectId: tenant.subject.id,
+          teachingAssignmentId:
+            classroomId === tenant.classroom.id
+              ? tenant.teachingAssignment.id
+              : classroomId === classB.id
+                ? assignmentB.id
+                : assignmentC.id,
           scheduledStart: new Date(`2026-09-${classroomId === tenant.classroom.id ? "01" : classroomId === classB.id ? "02" : "03"}T01:00:00.000Z`),
           scheduledEnd: new Date(`2026-09-${classroomId === tenant.classroom.id ? "01" : classroomId === classB.id ? "02" : "03"}T01:50:00.000Z`),
         },

@@ -12,3 +12,5 @@ export * from "./services/session.service.js";
 export * from "./services/student.service.js";
 export * from "./services/subject.service.js";
 export * from "./services/timetable.service.js";
+export * from "./services/today.service.js";
+export * from "./services/timezone.js";

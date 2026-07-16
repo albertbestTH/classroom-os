@@ -14,11 +14,11 @@ import type {
   Assessment,
   AttendanceRecord,
   Classroom,
-  ClassSession,
   Score,
   Student,
-  TimetableEntry,
 } from "../generated/prisma/client.js";
+import type { TimetableEntryWithDetails } from "../repositories/timetable.repository.js";
+import type { ClassSessionWithDetails } from "../repositories/session.repository.js";
 
 export function executeTenantService<T>(
   input: TenantServiceInput,
@@ -82,11 +82,15 @@ export function toClassroomResult(
   };
 }
 
-export function toTimetableEntryResult(entry: TimetableEntry): TimetableEntryResult {
+export function toTimetableEntryResult(
+  entry: TimetableEntryWithDetails,
+): TimetableEntryResult {
+  const assignment = entry.teachingAssignment;
   return {
     id: entry.id,
     schoolId: entry.schoolId,
     termId: entry.termId,
+    teachingAssignmentId: entry.teachingAssignmentId,
     teacherId: entry.teacherId,
     classroomId: entry.classroomId,
     subjectId: entry.subjectId,
@@ -95,15 +99,25 @@ export function toTimetableEntryResult(entry: TimetableEntry): TimetableEntryRes
     endTime: clockDateToString(entry.endTime),
     room: entry.room,
     isActive: entry.isActive,
+    teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
+    classroomName: assignment.classroom.name,
+    subjectCode: assignment.subject.code,
+    subjectName: assignment.subject.name,
+    termName: assignment.term.name,
+    academicYearName: assignment.term.academicYear.name,
   };
 }
 
-export function toClassSessionResult(session: ClassSession): ClassSessionResult {
+export function toClassSessionResult(
+  session: ClassSessionWithDetails,
+): ClassSessionResult {
+  const assignment = session.teachingAssignment;
   return {
     id: session.id,
     schoolId: session.schoolId,
     termId: session.termId,
     timetableEntryId: session.timetableEntryId,
+    teachingAssignmentId: session.teachingAssignmentId,
     classroomId: session.classroomId,
     subjectId: session.subjectId,
     teacherId: session.teacherId,
@@ -112,6 +126,14 @@ export function toClassSessionResult(session: ClassSession): ClassSessionResult 
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
     status: session.status,
+    teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
+    classroomName: assignment.classroom.name,
+    subjectCode: assignment.subject.code,
+    subjectName: assignment.subject.name,
+    termName: assignment.term.name,
+    academicYearName: assignment.term.academicYear.name,
+    enrolledStudentCount: session.enrolledStudentCount,
+    attendanceRecordedCount: session._count.attendanceRecords,
   };
 }
 

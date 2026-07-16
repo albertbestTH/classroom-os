@@ -11,6 +11,19 @@ type ReferenceClient = Pick<
   "term" | "teacher" | "classroom" | "subject" | "user"
 >;
 
+export async function requireSchoolSettingsForSchool(
+  client: Pick<PrismaClient, "school">,
+  input: TenantScope,
+) {
+  const schoolId = requireSchoolId(input);
+  const school = await client.school.findUnique({
+    where: { id: schoolId },
+    select: { id: true, timezone: true },
+  });
+  if (!school) throw new TenantRecordNotFoundError("School");
+  return school;
+}
+
 export type TenantReferenceInput = TenantScope & {
   termId?: string;
   teacherId?: string;

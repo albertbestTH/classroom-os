@@ -75,3 +75,11 @@ Sidebar items come from a pure role-to-navigation mapping. This improves discove
 Assignment results include display-safe teacher, classroom, subject, term, and academic-year labels. These labels preserve the complete assignment identity in the UI: the same subject taught in classrooms A and B appears as two rows and never becomes a combined class scope.
 
 GitHub Actions validates this boundary against an ephemeral PostgreSQL 16 service. CI applies the committed migration history with `prisma migrate deploy`; it never creates development migrations or persists the service volume.
+
+## Operational classroom boundary
+
+Timetable and session rows now store `teachingAssignmentId` in addition to their denormalized term, teacher, classroom, and subject snapshot. Server components query the application services with the trusted session context; focused client islands call authenticated route handlers for create/edit, materialize, start/end, and attendance actions. A teacher's query is always constrained by `teacherId`, while managers may request school-wide views and apply explicit filters.
+
+School-local dates are calculated with `Intl` and `School.timezone`, then converted to UTC instants for persistence. Materialization accepts a local `YYYY-MM-DD`, verifies the timetable weekday and term boundary, derives start/end instants from the entry's wall-clock times, and relies on `(timetableEntryId, scheduledStart)` uniqueness to reject a duplicate daily session.
+
+`SessionTimelineEvent` is a classroom-facing stream for start, attendance update, and end events. It stores only sanitized timestamps and counts. `AuditLog` is separate: it records mutation accountability across all domain entities and is not presented as the teacher's classroom narrative. A partial unique index on live sessions closes the concurrent-start race for each teacher.
