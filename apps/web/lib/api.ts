@@ -116,7 +116,21 @@ export function assertSameOrigin(request: NextRequest): void {
 }
 
 export async function requireApiSession(request: NextRequest): Promise<ResolvedSessionResult> {
-  return resolveServerSession(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+  return resolveServerSession(bearerTokenFromRequest(request) ?? request.cookies.get(AUTH_COOKIE_NAME)?.value);
+}
+
+export function bearerTokenFromRequest(request: NextRequest): string | null {
+  const authorization = request.headers.get("authorization");
+  if (!authorization) return null;
+  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization);
+  if (!match?.[1]) throw authError("UNAUTHENTICATED", "Authentication is required.");
+  return match[1];
+}
+
+export async function requireMobileApiSession(request: NextRequest): Promise<ResolvedSessionResult> {
+  const token = bearerTokenFromRequest(request);
+  if (!token) throw authError("UNAUTHENTICATED", "Mobile bearer authentication is required.");
+  return resolveServerSession(token);
 }
 
 type AuthenticatedHandler<T> = (
@@ -131,7 +145,7 @@ export async function withAuthenticatedApi<T>(
   successStatus = 200,
 ): Promise<NextResponse<ApiSuccessResponse<T> | ApiErrorResponse>> {
   try {
-    if (options.mutation) assertSameOrigin(request);
+    if (options.mutation && !request.headers.has("authorization")) assertSameOrigin(request);
     const session = await requireApiSession(request);
     const body = options.json ? await readJsonObject(request, options.maxBytes) : undefined;
     return apiSuccess(await handler(session, body), successStatus);

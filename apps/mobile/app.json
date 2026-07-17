@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Classroom OS",
+    "slug": "classroom-os-teacher",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "classroomos",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.classroomos.teacher" },
+    "android": { "package": "com.classroomos.teacher" }
+  }
+}

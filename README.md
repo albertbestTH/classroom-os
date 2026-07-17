@@ -36,6 +36,10 @@ The Compose service runs PostgreSQL 16 on `localhost:5432` with development-only
 
 Local `.env` files are ignored. Never place production credentials in this repository.
 
+## Teacher mobile app
+
+The Expo Router teacher application lives in `apps/mobile`. It provides the focused five-tab teacher workflow for today, assigned classes, live sessions and attendance, scores foundation, and profile. See [mobile local development](docs/mobile/local-development.md), [architecture](docs/mobile/architecture.md), and [teacher workflows](docs/mobile/teacher-workflows.md).
+
 To deliberately reset the disposable local database, first stop Compose and remove its volume, then recreate and migrate it:
 
 ```powershell

@@ -25,6 +25,14 @@ export interface CurrentUserResult extends TrustedAuthContext {
   firstName: string;
   lastName: string;
   schoolName: string;
+  employeeCode: string | null;
+  assignmentCount: number;
+}
+
+export interface MobileSessionResult {
+  token: string;
+  expiresAt: string;
+  user: CurrentUserResult;
 }
 
 export type ApiErrorCode =

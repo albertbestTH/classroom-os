@@ -52,7 +52,7 @@ function mapCurrentUser(record: {
   lastName: string;
   role: CurrentUserResult["role"];
   school: { name: string };
-  teacherProfile: { id: string } | null;
+  teacherProfile: { id: string; employeeCode: string; _count: { teachingAssignments: number } } | null;
 }): CurrentUserResult {
   return {
     userId: record.id,
@@ -63,6 +63,8 @@ function mapCurrentUser(record: {
     firstName: record.firstName,
     lastName: record.lastName,
     schoolName: record.school.name,
+    employeeCode: record.teacherProfile?.employeeCode ?? null,
+    assignmentCount: record.teacherProfile?._count.teachingAssignments ?? 0,
   };
 }
 
@@ -84,7 +86,7 @@ export async function authenticateWithPassword(
     where: { email },
     include: {
       school: { select: { name: true, isActive: true } },
-      teacherProfile: { select: { id: true, isActive: true } },
+      teacherProfile: { select: { id: true, employeeCode: true, isActive: true, _count: { select: { teachingAssignments: true } } } },
     },
   });
   const passwordHash = user?.passwordHash ?? (await getDummyPasswordHash());
@@ -155,7 +157,7 @@ export async function resolveServerSession(
       user: {
         include: {
           school: { select: { name: true, isActive: true } },
-          teacherProfile: { select: { id: true, isActive: true } },
+          teacherProfile: { select: { id: true, employeeCode: true, isActive: true, _count: { select: { teachingAssignments: true } } } },
         },
       },
     },

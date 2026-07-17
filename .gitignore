@@ -4,3 +4,6 @@ packages/database/.env
 packages/database/dist
 packages/database/src/generated
 packages/types/dist
+apps/mobile/.env
+apps/mobile/.expo
+apps/mobile/dist
