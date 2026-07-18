@@ -125,6 +125,7 @@ export function getSessionAttendanceRoster(input: {
         firstName: student.firstName,
         lastName: student.lastName,
         preferredName: student.preferredName,
+        profileImageKey: student.profileImageKey,
         status: record?.status ?? null,
         note: record?.note ?? null,
         recordedAt: record?.recordedAt.toISOString() ?? null,

@@ -354,6 +354,7 @@ export interface StudentResult {
   firstName: string;
   lastName: string;
   preferredName: string | null;
+  profileImageKey: string | null;
   dateOfBirth: string | null;
   isActive: boolean;
 }
@@ -484,6 +485,7 @@ export interface SessionAttendanceStudentResult {
   firstName: string;
   lastName: string;
   preferredName: string | null;
+  profileImageKey: string | null;
   status: AttendanceStatus | null;
   note: string | null;
   recordedAt: string | null;

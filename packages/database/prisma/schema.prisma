@@ -217,16 +217,18 @@ model Teacher {
 }
 
 model Student {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId      String    @db.Uuid
-  studentNumber String
-  firstName     String
-  lastName      String
-  preferredName String?
-  dateOfBirth   DateTime? @db.Date
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId        String    @db.Uuid
+  studentNumber   String
+  firstName       String
+  lastName        String
+  preferredName   String?
+  /// Private object-storage key for a display-only profile image. Never biometric data.
+  profileImageKey String?
+  dateOfBirth     DateTime? @db.Date
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   school                School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   classEnrollments      ClassEnrollment[]

@@ -55,6 +55,7 @@ export function toStudentResult(student: Student): StudentResult {
     firstName: student.firstName,
     lastName: student.lastName,
     preferredName: student.preferredName,
+    profileImageKey: student.profileImageKey,
     dateOfBirth: student.dateOfBirth?.toISOString().slice(0, 10) ?? null,
     isActive: student.isActive,
   };

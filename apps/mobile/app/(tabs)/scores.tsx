@@ -1,8 +1,50 @@
-import type { TeachingAssignmentResult } from "@classroom-os/types";
-import { Text } from "react-native";
+import type { TodayTimetableResult } from "@classroom-os/types";
+import { router } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
 
-import { AppHeader, Card, EmptyState, ErrorState, LoadingSkeleton, SafeScreen } from "@/components/ui/primitives";
+import { AppButton, AppHeader, Card, EmptyState, ErrorState, LoadingSkeleton, MetricCard, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { colors, spacing } from "@/constants/tokens";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { thaiErrorMessage } from "@/lib/api-error";
 
-export default function ScoresScreen() { const assignments = useAuthenticatedQuery<TeachingAssignmentResult[]>(["assignments"], "/api/teaching-assignments"); if (assignments.isLoading) return <LoadingSkeleton />; if (assignments.error) return <SafeScreen><ErrorState message={thaiErrorMessage(assignments.error)} onRetry={() => void assignments.refetch()} /></SafeScreen>; return <SafeScreen><AppHeader title="คะแนน" subtitle="พื้นที่คะแนนตามชั้นเรียนและรายวิชาที่คุณสอน" />{assignments.data?.map((item) => <Card key={item.id}><Text style={{ fontSize: 17, fontWeight: "700" }}>{item.classroomName}</Text><Text>{item.subjectName} · {item.termName}</Text></Card>)}<EmptyState title="การบันทึกคะแนนบนมือถือกำลังเตรียมให้พร้อม" description="ขณะนี้ยังไม่มี Gradebook API ที่สมบูรณ์ แอปจะไม่แสดงคะแนนหรือเกรดจำลอง" /></SafeScreen>; }
+export default function RecordsScreen() {
+  const today = useAuthenticatedQuery<TodayTimetableResult>(["today"], "/api/me/today");
+  if (today.isLoading) return <LoadingSkeleton />;
+  if (today.error || !today.data) return <SafeScreen><ErrorState message={thaiErrorMessage(today.error)} onRetry={() => void today.refetch()} /></SafeScreen>;
+
+  const live = today.data.classes.find((item) => item.status === "live" && item.session);
+  const completed = today.data.classes.filter((item) => item.status === "completed" && item.session);
+  const recorded = today.data.classes.reduce((sum, item) => sum + (item.session?.attendanceRecordedCount ?? 0), 0);
+  const enrolled = today.data.classes.reduce((sum, item) => sum + (item.session?.enrolledStudentCount ?? 0), 0);
+
+  return <SafeScreen>
+    <AppHeader title="บันทึก" subtitle="งานระหว่างคาบและรายการที่ต้องติดตาม" />
+    <View style={styles.metrics}>
+      <MetricCard label="เช็กชื่อวันนี้" value={`${recorded}/${enrolled}`} />
+      <MetricCard label="คาบเสร็จแล้ว" value={completed.length} />
+    </View>
+    <SectionHeader title="คาบปัจจุบัน" action={live ? <StatusBadge label="LIVE" tone="live" /> : undefined} />
+    {live?.session ? <Card>
+      <Text style={styles.title}>{live.timetableEntry.classroomName}</Text>
+      <Text style={styles.subtitle}>{live.timetableEntry.subjectName} · นักเรียน {live.session.enrolledStudentCount} คน</Text>
+      <AppButton label="เช็กชื่อและบันทึกคาบ" onPress={() => router.push(`/sessions/${live.session!.id}`)} />
+    </Card> : <EmptyState title="ยังไม่มีคาบที่กำลังสอน" description="เริ่มคาบจากหน้า วันนี้ หรือตารางสอน แล้วกลับมาบันทึกได้ทันที" />}
+    <SectionHeader title="คาบที่สรุปได้วันนี้" />
+    {completed.length ? completed.map((item) => <Card key={item.session!.id}>
+      <Text style={styles.title}>{item.timetableEntry.classroomName}</Text>
+      <Text style={styles.subtitle}>{item.timetableEntry.subjectName} · เช็กชื่อ {item.session!.attendanceRecordedCount}/{item.session!.enrolledStudentCount}</Text>
+      <AppButton label="ดูสรุปคาบ" tone="secondary" onPress={() => router.push(`/sessions/${item.session!.id}/summary`)} />
+    </Card>) : <Text style={styles.muted}>เมื่อจบคาบ รายการสรุปจะปรากฏที่นี่</Text>}
+    <Card>
+      <Text style={styles.title}>คะแนนด่วน</Text>
+      <Text style={styles.muted}>ขั้นถัดไปจะรองรับคะแนนการมีส่วนร่วม แบบทดสอบสั้น และงานในคาบ โดยไม่แทน Gradebook เต็มรูปแบบบนเว็บ</Text>
+    </Card>
+  </SafeScreen>;
+}
+
+const styles = StyleSheet.create({
+  metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  title: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  subtitle: { color: colors.text, fontSize: 15, lineHeight: 22 },
+  muted: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+});

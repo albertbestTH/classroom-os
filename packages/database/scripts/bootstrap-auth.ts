@@ -66,6 +66,9 @@ async function main(): Promise<void> {
       { email: "owner@synthetic.classroom.test", firstName: "Synthetic", lastName: "Owner", role: "SCHOOL_OWNER" as const },
       { email: "admin@synthetic.classroom.test", firstName: "Synthetic", lastName: "Admin", role: "ADMIN" as const },
       { email: "teacher@synthetic.classroom.test", firstName: "Synthetic", lastName: "Teacher", role: "TEACHER" as const },
+      { email: "teacher2@synthetic.classroom.test", firstName: "กานดา", lastName: "สังเคราะห์", role: "TEACHER" as const },
+      { email: "teacher3@synthetic.classroom.test", firstName: "ปรีชา", lastName: "สังเคราะห์", role: "TEACHER" as const },
+      { email: "teacher4@synthetic.classroom.test", firstName: "วารุณี", lastName: "สังเคราะห์", role: "TEACHER" as const },
     ];
     const accounts = [];
     for (const account of accountDefinitions) {
@@ -84,24 +87,27 @@ async function main(): Promise<void> {
         }),
       );
     }
-    const teacherUser = accounts[2];
-    if (!teacherUser) throw new Error("Synthetic teacher account was not created.");
-    const teacher = await prisma.teacher.upsert({
-      where: { schoolId_employeeCode: { schoolId: school.id, employeeCode: "SYN-T-001" } },
-      update: { userId: teacherUser.id, isActive: true },
-      create: {
-        schoolId: school.id,
-        userId: teacherUser.id,
-        employeeCode: "SYN-T-001",
-        firstName: "Synthetic",
-        lastName: "Teacher",
-      },
-    });
+    const teachers = [];
+    for (let teacherIndex = 0; teacherIndex < 4; teacherIndex += 1) {
+      const teacherUser = accounts[teacherIndex + 2];
+      if (!teacherUser) throw new Error(`Synthetic teacher account ${teacherIndex + 1} was not created.`);
+      const employeeCode = `SYN-T-${String(teacherIndex + 1).padStart(3, "0")}`;
+      teachers.push(await prisma.teacher.upsert({
+        where: { schoolId_employeeCode: { schoolId: school.id, employeeCode } },
+        update: { userId: teacherUser.id, firstName: teacherUser.firstName, lastName: teacherUser.lastName, isActive: true },
+        create: { schoolId: school.id, userId: teacherUser.id, employeeCode, firstName: teacherUser.firstName, lastName: teacherUser.lastName },
+      }));
+    }
 
     const classroomDefinitions = [
       ["SYN-A", "Synthetic Classroom A"],
       ["SYN-B", "Synthetic Classroom B"],
-      ["SYN-C", "Synthetic Classroom C (unassigned)"],
+      ["SYN-C", "Synthetic Classroom C"],
+      ["SYN-D", "Synthetic Classroom D"],
+      ["SYN-E", "Synthetic Classroom E"],
+      ["SYN-F", "Synthetic Classroom F"],
+      ["SYN-G", "Synthetic Classroom G"],
+      ["SYN-H", "Synthetic Classroom H"],
     ] as const;
     const classrooms = [];
     for (const [code, name] of classroomDefinitions) {
@@ -116,6 +122,9 @@ async function main(): Promise<void> {
     const subjectDefinitions = [
       ["SYN-MATH", "Synthetic Mathematics"],
       ["SYN-SCI", "Synthetic Science"],
+      ["SYN-THAI", "Synthetic Thai Language"],
+      ["SYN-ENG", "Synthetic English"],
+      ["SYN-SOC", "Synthetic Social Studies"],
     ] as const;
     const subjects = [];
     for (const [code, name] of subjectDefinitions) {
@@ -127,96 +136,108 @@ async function main(): Promise<void> {
         }),
       );
     }
-    const [classA, classB] = classrooms;
-    const [math, science] = subjects;
-    if (!classA || !classB || !math || !science) {
+    if (classrooms.length !== 8 || subjects.length !== 5 || teachers.length !== 4) {
       throw new Error("Synthetic authorization fixtures were not created.");
     }
-    let classAMathAssignmentId = "";
-    for (const assignment of [
-      { classroomId: classA.id, subjectId: math.id },
-      { classroomId: classB.id, subjectId: math.id },
-      { classroomId: classB.id, subjectId: science.id },
-    ]) {
-      const created = await prisma.teachingAssignment.upsert({
-        where: {
-          schoolId_termId_teacherId_classroomId_subjectId: {
-            schoolId: school.id,
-            termId: term.id,
-            teacherId: teacher.id,
-            ...assignment,
-          },
-        },
-        update: {},
-        create: {
-          schoolId: school.id,
-          termId: term.id,
-          teacherId: teacher.id,
-          ...assignment,
-        },
-      });
-      if (assignment.classroomId === classA.id && assignment.subjectId === math.id) {
-        classAMathAssignmentId = created.id;
-      }
-    }
 
-    const students = [];
-    for (const definition of [
+    const syntheticFirstNames = [
+      "กิตติ", "กมล", "ขวัญใจ", "จิรภัทร", "ชนากานต์", "ณัฐดนัย", "ณิชา", "ธนกฤต", "ธัญชนก", "นภัส",
+      "ปภาวิน", "ปุณณภพ", "พราว", "พีรวิชญ์", "ภัทรา", "มณีรัตน์", "รวิภา", "วรัญญา", "ศิริน", "สรวิชญ์",
+      "สุชาดา", "อภิชญา", "อริสรา", "อัญชลี", "อินทัช", "เขมิกา", "เจษฎา", "เมธาวี", "โยธิน", "ไอรดา",
+    ] as const;
+    const originalClassAStudents = [
       ["SYN-ST-001", "สมชาย", "ตัวอย่าง"],
       ["SYN-ST-002", "สมหญิง", "ทดสอบ"],
       ["SYN-ST-003", "กิตติ", "สังเคราะห์"],
-    ] as const) {
-      students.push(await prisma.student.upsert({
-        where: { schoolId_studentNumber: { schoolId: school.id, studentNumber: definition[0] } },
-        update: { firstName: definition[1], lastName: definition[2], isActive: true },
-        create: { schoolId: school.id, studentNumber: definition[0], firstName: definition[1], lastName: definition[2] },
-      }));
+    ] as const;
+    const classroomRosters = classrooms.map((classroom, classroomIndex) => ({
+      classroom,
+      definitions: Array.from({ length: 30 }, (_, studentIndex) => {
+        if (classroomIndex === 0 && studentIndex < originalClassAStudents.length) {
+          return originalClassAStudents[studentIndex]!;
+        }
+        const classroomCode = String.fromCharCode(65 + classroomIndex);
+        const sequence = String(studentIndex + 1).padStart(3, "0");
+        return [
+          `SYN-${classroomCode}-${sequence}`,
+          syntheticFirstNames[studentIndex]!,
+          `สังเคราะห์ ${classroomCode}${sequence}`,
+        ] as const;
+      }),
+    }));
+    for (const { classroom, definitions } of classroomRosters) {
+      for (const [studentNumber, firstName, lastName] of definitions) {
+        const student = await prisma.student.upsert({
+          where: { schoolId_studentNumber: { schoolId: school.id, studentNumber } },
+          update: { firstName, lastName, isActive: true },
+          create: { schoolId: school.id, studentNumber, firstName, lastName },
+        });
+        await prisma.classEnrollment.upsert({
+          where: { termId_classroomId_studentId: { termId: term.id, classroomId: classroom.id, studentId: student.id } },
+          update: { schoolId: school.id, isActive: true, leftAt: null },
+          create: { schoolId: school.id, termId: term.id, classroomId: classroom.id, studentId: student.id },
+        });
+      }
     }
-    for (const student of students) {
-      await prisma.classEnrollment.upsert({
-        where: { termId_classroomId_studentId: { termId: term.id, classroomId: classA.id, studentId: student.id } },
-        update: { schoolId: school.id, isActive: true, leftAt: null },
-        create: { schoolId: school.id, termId: term.id, classroomId: classA.id, studentId: student.id },
-      });
-    }
-
-    const localDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: school.timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    const [year, month, day] = localDate.split("-").map(Number);
-    const jsWeekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay();
-    const weekday = jsWeekday === 0 ? 7 : jsWeekday;
-    if (!classAMathAssignmentId) throw new Error("Synthetic class assignment is missing.");
-    const e2eTimetable = await prisma.timetableEntry.upsert({
-      where: {
-        schoolId_termId_weekday_startTime_classroomId: {
-          schoolId: school.id,
-          termId: term.id,
-          weekday,
-          startTime: new Date("1970-01-01T23:00:00.000Z"),
-          classroomId: classA.id,
-        },
-      },
-      update: { teachingAssignmentId: classAMathAssignmentId, teacherId: teacher.id, subjectId: math.id, endTime: new Date("1970-01-01T23:50:00.000Z"), room: "SYN-E2E", isActive: true },
-      create: { schoolId: school.id, termId: term.id, teachingAssignmentId: classAMathAssignmentId, teacherId: teacher.id, classroomId: classA.id, subjectId: math.id, weekday, startTime: new Date("1970-01-01T23:00:00.000Z"), endTime: new Date("1970-01-01T23:50:00.000Z"), room: "SYN-E2E" },
-    });
-    const staleSessions = await prisma.classSession.findMany({
-      where: { schoolId: school.id, timetableEntryId: e2eTimetable.id },
-      select: { id: true },
-    });
-    const staleSessionIds = staleSessions.map(({ id }) => id);
-    if (staleSessionIds.length) {
-      await prisma.attendanceCorrection.deleteMany({ where: { schoolId: school.id, classSessionId: { in: staleSessionIds } } });
-      await prisma.attendanceRecord.deleteMany({ where: { schoolId: school.id, classSessionId: { in: staleSessionIds } } });
-      await prisma.sessionTimelineEvent.deleteMany({ where: { schoolId: school.id, classSessionId: { in: staleSessionIds } } });
-      await prisma.auditLog.deleteMany({ where: { schoolId: school.id } });
-      await prisma.classSession.deleteMany({ where: { schoolId: school.id, id: { in: staleSessionIds } } });
+    const rosterCounts = await Promise.all(classrooms.map((classroom) => prisma.classEnrollment.count({
+      where: { schoolId: school.id, termId: term.id, classroomId: classroom.id, isActive: true, leftAt: null },
+    })));
+    if (rosterCounts.some((count) => count !== 30)) {
+      throw new Error(`Synthetic classrooms must contain exactly 30 active students; found ${rosterCounts.join(", ")}.`);
     }
 
-    console.info("Synthetic authentication fixtures are ready for local development.");
+    // PostgreSQL `time` stores local wall-clock values without a timezone. These
+    // values are interpreted using the school's Asia/Bangkok timezone by services.
+    const timeSlots = [
+      ["08:30", "09:20"],
+      ["09:30", "10:20"],
+      ["10:30", "11:20"],
+      ["12:30", "13:20"],
+      ["13:30", "14:20"],
+    ] as const;
+    const dailyLoads = [5, 5, 4, 4, 4] as const;
+    await prisma.timetableEntry.updateMany({
+      where: { schoolId: school.id, termId: term.id },
+      data: { isActive: false },
+    });
+    const assignmentIds = new Map<string, string>();
+    for (let teacherIndex = 0; teacherIndex < teachers.length; teacherIndex += 1) {
+      const teacher = teachers[teacherIndex]!;
+      for (let dayIndex = 0; dayIndex < dailyLoads.length; dayIndex += 1) {
+        const weekday = dayIndex + 1;
+        for (let slotIndex = 0; slotIndex < dailyLoads[dayIndex]!; slotIndex += 1) {
+          const classroom = classrooms[(teacherIndex + dayIndex + slotIndex) % classrooms.length]!;
+          const subject = subjects[(teacherIndex + dayIndex + slotIndex) % subjects.length]!;
+          const assignmentKey = `${teacher.id}:${classroom.id}:${subject.id}`;
+          let teachingAssignmentId = assignmentIds.get(assignmentKey);
+          if (!teachingAssignmentId) {
+            const assignment = await prisma.teachingAssignment.upsert({
+              where: { schoolId_termId_teacherId_classroomId_subjectId: { schoolId: school.id, termId: term.id, teacherId: teacher.id, classroomId: classroom.id, subjectId: subject.id } },
+              update: {},
+              create: { schoolId: school.id, termId: term.id, teacherId: teacher.id, classroomId: classroom.id, subjectId: subject.id },
+            });
+            teachingAssignmentId = assignment.id;
+            assignmentIds.set(assignmentKey, teachingAssignmentId);
+          }
+          const [startsAt, endsAt] = timeSlots[slotIndex]!;
+          const startTime = new Date(`1970-01-01T${startsAt}:00.000Z`);
+          const endTime = new Date(`1970-01-01T${endsAt}:00.000Z`);
+          await prisma.timetableEntry.upsert({
+            where: { schoolId_termId_weekday_startTime_teacherId: { schoolId: school.id, termId: term.id, weekday, startTime, teacherId: teacher.id } },
+            update: { teachingAssignmentId, classroomId: classroom.id, subjectId: subject.id, endTime, room: classroom.code, isActive: true },
+            create: { schoolId: school.id, termId: term.id, teachingAssignmentId, teacherId: teacher.id, classroomId: classroom.id, subjectId: subject.id, weekday, startTime, endTime, room: classroom.code },
+          });
+        }
+      }
+    }
+    const weeklyLoads = await Promise.all(teachers.map((teacher) => prisma.timetableEntry.count({
+      where: { schoolId: school.id, termId: term.id, teacherId: teacher.id, isActive: true },
+    })));
+    if (weeklyLoads.some((count) => count !== 22)) {
+      throw new Error(`Synthetic teachers must have exactly 22 active periods; found ${weeklyLoads.join(", ")}.`);
+    }
+
+    console.info(`Synthetic fixtures are ready: ${teachers.length} teachers × 22 weekly periods, ${classrooms.length} classrooms × 30 students, timezone ${school.timezone}.`);
   } finally {
     await prisma.$disconnect();
   }
