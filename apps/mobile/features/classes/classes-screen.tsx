@@ -9,6 +9,7 @@ import { colors, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
+import { formatTimetableTime } from "@/lib/time";
 
 const weekdays = [
   { value: 1, label: "วันจันทร์" },
@@ -17,10 +18,6 @@ const weekdays = [
   { value: 4, label: "วันพฤหัสบดี" },
   { value: 5, label: "วันศุกร์" },
 ] as const;
-
-function time(value: string) {
-  return value.match(/\d{2}:\d{2}/)?.[0] ?? value;
-}
 
 export function ClassesScreen() {
   const { token } = useAuth();
@@ -78,7 +75,7 @@ export function ClassesScreen() {
           return <Card key={entry.id}>
             <View style={styles.row}>
               <View style={styles.flex}>
-                <Text style={styles.time}>{time(entry.startTime)}–{time(entry.endTime)} น.</Text>
+                <Text style={styles.time}>{formatTimetableTime(entry.startTime)}–{formatTimetableTime(entry.endTime)} น.</Text>
                 <Text style={styles.classroom}>{entry.classroomName}</Text>
                 <Text style={styles.subject}>{entry.subjectName}</Text>
               </View>

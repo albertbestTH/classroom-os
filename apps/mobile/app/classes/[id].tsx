@@ -4,6 +4,7 @@ import { Text } from "react-native";
 
 import { AppButton, AppHeader, Card, ErrorState, LoadingSkeleton, SafeScreen } from "@/components/ui/primitives";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
+import { formatTimetableTime } from "@/lib/time";
 import { thaiErrorMessage } from "@/lib/api-error";
 
 const weekday = ["", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"];
@@ -23,7 +24,7 @@ export default function ClassDetailScreen() {
     <Card>
       <Text>ปีการศึกษา {assignment.academicYearName}</Text>
       <Text>ตารางประจำสัปดาห์ {slots.length} คาบ</Text>
-      {slots.map((slot) => <Text key={slot.id}>{weekday[slot.weekday]} · {slot.startTime.slice(11, 16)}–{slot.endTime.slice(11, 16)} น.{slot.room ? ` · ห้อง ${slot.room}` : ""}</Text>)}
+      {slots.map((slot) => <Text key={slot.id}>{weekday[slot.weekday]} · {formatTimetableTime(slot.startTime)}–{formatTimetableTime(slot.endTime)} น.{slot.room ? ` · ห้อง ${slot.room}` : ""}</Text>)}
     </Card>
   </SafeScreen>;
 }
