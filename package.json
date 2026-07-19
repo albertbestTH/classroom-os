@@ -17,6 +17,7 @@
     "db:migrate": "pnpm --filter @classroom-os/database db:migrate",
     "db:migrate:status": "pnpm --filter @classroom-os/database db:migrate:status",
     "db:bootstrap:auth": "pnpm --filter @classroom-os/database db:bootstrap:auth",
+    "db:e2e:prepare": "pnpm --filter @classroom-os/database db:e2e:prepare",
     "db:e2e:cleanup": "pnpm --filter @classroom-os/database db:e2e:cleanup",
     "db:studio": "pnpm --filter @classroom-os/database db:studio",
     "db:test": "pnpm --filter @classroom-os/database db:test",

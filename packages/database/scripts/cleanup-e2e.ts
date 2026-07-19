@@ -31,6 +31,7 @@ try {
       await prisma.auditLog.deleteMany({ where: { schoolId: school.id } });
       await prisma.classSession.deleteMany({ where: { schoolId: school.id, id: { in: ids } } });
     }
+    await prisma.timetableEntry.deleteMany({ where: { schoolId: school.id, room: "SYN-E2E" } });
   }
   console.info("Synthetic E2E session data was cleaned up.");
 } finally {

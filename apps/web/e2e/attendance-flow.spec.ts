@@ -18,14 +18,48 @@ function captureConsoleErrors(page: Page) {
   return errors;
 }
 
+function nextMonday(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  const today = new Date(Date.UTC(value("year"), value("month") - 1, value("day")));
+  const isoWeekday = today.getUTCDay() || 7;
+  const daysUntilMonday = ((1 - isoWeekday + 7) % 7) || 7;
+  today.setUTCDate(today.getUTCDate() + daysUntilMonday);
+  return today.toISOString().slice(0, 10);
+}
+
+async function startSyntheticSession(page: Page): Promise<string> {
+  const timetableResponse = await page.request.get("/api/timetable");
+  expect(timetableResponse.ok(), await timetableResponse.text()).toBe(true);
+  const timetable = (await timetableResponse.json()) as { data: Array<{ id: string; room: string | null }> };
+  const entry = timetable.data.find((item) => item.room === "SYN-E2E");
+  expect(entry).toBeTruthy();
+
+  const headers = { origin: "http://127.0.0.1:3100" };
+  const materializedResponse = await page.request.post(`/api/timetable/${entry!.id}/materialize`, {
+    data: { localDate: nextMonday() },
+    headers,
+  });
+  expect(materializedResponse.ok(), await materializedResponse.text()).toBe(true);
+  const materialized = (await materializedResponse.json()) as { data: { id: string } };
+  const startResponse = await page.request.post(`/api/sessions/${materialized.data.id}/start`, {
+    data: {},
+    headers,
+  });
+  expect(startResponse.ok(), await startResponse.text()).toBe(true);
+  return materialized.data.id;
+}
+
 test.describe.serial("attendance workflow", () => {
   test("teacher starts, records, changes, saves, ends, and reviews a class", async ({ page }) => {
     await login(page, "teacher@synthetic.classroom.test");
-    const materializeResponse = page.waitForResponse((response) => response.url().includes("/materialize"));
-    await page.getByRole("button", { name: "เริ่มคาบเรียน" }).first().click();
-    const materialized = await materializeResponse;
-    expect(materialized.ok(), await materialized.text()).toBe(true);
-    await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/, { timeout: 30_000 });
+    const startedSessionId = await startSyntheticSession(page);
+    await page.goto(`/sessions/${startedSessionId}`);
     await expect(page.getByText("LIVE · กำลังสอน")).toBeVisible({ timeout: 15_000 });
     await page.getByRole("main").getByRole("link", { name: "เช็กชื่อ" }).click();
     await page.getByRole("button", { name: "ทำเครื่องหมายว่ามาทั้งหมด" }).click();
@@ -34,7 +68,7 @@ test.describe.serial("attendance workflow", () => {
     await page.getByRole("button", { name: "บันทึก" }).click();
     const saved = await saveResponse;
     expect(saved.ok(), await saved.text()).toBe(true);
-    await expect(page.getByText(/บันทึกการเข้าเรียน 3 คนแล้ว/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/บันทึกการเข้าเรียน 30 คนแล้ว/)).toBeVisible({ timeout: 15_000 });
     const sessionId = page.url().match(/sessions\/([^/]+)/)?.[1];
     expect(sessionId).toBeTruthy();
     await page.goto(`/sessions/${sessionId}`);
