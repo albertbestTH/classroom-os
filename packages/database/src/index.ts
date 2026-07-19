@@ -11,6 +11,7 @@ export * from "./services/attendance-report.service.js";
 export * from "./services/classroom.service.js";
 export * from "./services/dashboard.service.js";
 export * from "./services/health.service.js";
+export * from "./services/profile.service.js";
 export * from "./services/session.service.js";
 export * from "./services/student.service.js";
 export * from "./services/subject.service.js";

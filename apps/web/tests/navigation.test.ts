@@ -8,9 +8,9 @@ describe("role-based navigation", () => {
     expect(items.map(({ href }) => href)).toEqual(["/", "/students", "/staff", "/classrooms", "/subjects", "/academic-years", "/terms", "/timetable", "/attendance", "/gradebook", "/reports", "/import", "/documents", "/settings"]);
   });
 
-  it("omits owner settings for admins", () => {
+  it("shows general school settings for admins", () => {
     const hrefs = navigationForRole("ADMIN").map(({ href }) => href);
-    expect(hrefs).toEqual(["/", "/students", "/staff", "/classrooms", "/subjects", "/academic-years", "/terms", "/timetable", "/attendance", "/gradebook", "/reports", "/import", "/documents"]);
+    expect(hrefs).toEqual(["/", "/students", "/staff", "/classrooms", "/subjects", "/academic-years", "/terms", "/timetable", "/attendance", "/gradebook", "/reports", "/import", "/documents", "/settings"]);
   });
 
   it("shows only teacher work routes to teachers", () => {

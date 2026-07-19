@@ -13,6 +13,7 @@ type AuthContextValue = {
   token: string | null;
   message: string | null;
   login(email: string, password: string): Promise<void>;
+  updateUser(user: CurrentUserResult): void;
   logout(): Promise<void>;
 };
 
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(() => ({
     state, user, token, message,
+    updateUser(nextUser) { setUser(nextUser); },
     async login(email, password) {
       await clearPersistedQueries(); queryClient.clear();
       const session = await apiRequest<MobileSessionResult>("/api/mobile/auth/login", { method: "POST", body: { email, password }, retryReads: 0 });

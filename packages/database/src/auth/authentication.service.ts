@@ -50,6 +50,7 @@ function mapCurrentUser(record: {
   email: string;
   firstName: string;
   lastName: string;
+  phoneNumber: string | null;
   role: CurrentUserResult["role"];
   school: { name: string };
   teacherProfile: { id: string; employeeCode: string; _count: { teachingAssignments: number } } | null;
@@ -62,6 +63,7 @@ function mapCurrentUser(record: {
     email: record.email,
     firstName: record.firstName,
     lastName: record.lastName,
+    phoneNumber: record.phoneNumber,
     schoolName: record.school.name,
     employeeCode: record.teacherProfile?.employeeCode ?? null,
     assignmentCount: record.teacherProfile?._count.teachingAssignments ?? 0,

@@ -121,3 +121,10 @@ Bearer-authenticated native mutations do not depend on browser Origin/CSRF heade
 ## Gradebook synchronization
 
 `GET /api/assessments?teachingAssignmentId=...` returns the exact-assignment gradebook for web and mobile. A substitute may add `classSessionId` when accessing a covered live session; the server validates dated session access and that its assignment matches. Mobile quick score creates an optional session-linked participation assessment and writes through the same `PUT /api/assessments/:id/scores` command used by web. No client-local gradebook is authoritative, missing values are `null`, and numeric zero is preserved.
+
+## Profile and registration routes
+
+- `GET|PATCH /api/profile` reads or updates the authenticated account's own name and phone.
+- `POST /api/profile/email-change` requires the current password; `/confirm` consumes a short-lived token and revokes sessions.
+- `GET|PATCH /api/school-profile` is limited to owner/admin and accepts general contact data only.
+- `POST /api/registration` requests a new-school registration; `/confirm` creates the isolated school and first owner. Public mutations are rate-limited. Existing-school membership remains invitation-only.

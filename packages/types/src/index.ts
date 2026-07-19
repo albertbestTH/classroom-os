@@ -24,9 +24,69 @@ export interface CurrentUserResult extends TrustedAuthContext {
   email: string;
   firstName: string;
   lastName: string;
+  phoneNumber: string | null;
   schoolName: string;
   employeeCode: string | null;
   assignmentCount: number;
+}
+
+export interface UpdateOwnProfileInput {
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string | null;
+}
+
+export type OwnProfileResult = CurrentUserResult;
+
+export interface RequestEmailChangeInput {
+  newEmail: string;
+  currentPassword: string;
+}
+
+export interface VerificationRequestResult {
+  expiresAt: string;
+  developmentToken?: string;
+}
+
+export interface ConfirmEmailChangeInput {
+  token: string;
+}
+
+export interface SchoolProfileResult {
+  id: string;
+  name: string;
+  code: string;
+  timezone: string;
+  email: string | null;
+  phoneNumber: string | null;
+  address: string | null;
+}
+
+export interface UpdateSchoolProfileInput {
+  name: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  address?: string | null;
+}
+
+export interface RegisterSchoolInput {
+  schoolName: string;
+  schoolCode: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string | null;
+  email: string;
+  password: string;
+}
+
+export interface ConfirmSchoolRegistrationInput {
+  token: string;
+}
+
+export interface SchoolRegistrationResult {
+  schoolId: string;
+  ownerUserId: string;
+  email: string;
 }
 
 export interface MobileSessionResult {

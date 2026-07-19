@@ -121,3 +121,9 @@ Run the synthetic browser suite with `pnpm e2e`. It covers teacher login, start/
 The authenticated dashboard combines the existing start/resume and today-schedule actions with tenant-safe attendance analytics. Teachers receive only their exact teaching assignments; each classroom and subject remains a separate comparison row even when names or subjects match. Owners and admins receive an explicitly labeled school-wide view with optional 7/30-day, term, teacher, classroom, and subject filters. API responses declare `scope` as `TEACHER`, `SCHOOL`, or `TEACHER_FILTERED`, include `viewerRole`, and expose only validated available teaching contexts.
 
 Today's attendance percentage is `(present + late) / eligible attendance rows`. Completion percentage is `recorded rows / eligible rows`. Trend points use `School.timezone`; a day without a qualifying session is represented as no data, never as invented 0% attendance. Donut, line, comparison, and session-status visualizations include visible values, text summaries, empty states, keyboard-visible links, and labels that do not depend on color alone.
+
+## Profiles and school registration
+
+Teachers can update their own name and phone number on Web and Teacher Mobile. Email changes require the current password plus a short-lived verification token and revoke all active sessions after confirmation. Owners and admins can update only the general school profile on Web; owner/security controls remain separate.
+
+Public registration creates a new school tenant and its first `SCHOOL_OWNER`. It never joins an existing school. Local development returns the one-time verification token for synthetic end-to-end testing; production requires an approved email delivery integration before onboarding real schools.

@@ -92,7 +92,7 @@ Legend: **Full** = tenant-wide authorized management; **Assigned** = exact teach
 | Reports | School-wide | School-wide | Personal/assigned | Own planned | Child planned |
 | Imports | Full | Full | No | No | No |
 | Documents | School administration | School administration | Assigned/personal resources | Published resources planned | Published resources planned |
-| Settings | Owner-only | No owner settings | No | No | No |
+| Settings | Full, including owner-only security controls | General school profile only; no owner/security controls | Own profile only | No | No |
 
 Role checks are enforced server-side. Navigation visibility is never an authorization boundary.
 
@@ -208,14 +208,14 @@ The implementation-level source of truth is [Classroom OS Data Model](../archite
 
 ### School onboarding — partially implemented
 
-1. Create the school tenant and owner account through an authorized provisioning path.
+1. Register a new school and verify the owner email. Self-registration always creates a new tenant and `SCHOOL_OWNER`; joining an existing school requires an invitation.
 2. Configure timezone and school identity.
 3. Create the current academic year and term.
 4. Add subjects, classrooms, staff, and students.
 5. Create enrollments and teaching assignments.
 6. Build the timetable and verify conflicts.
 
-Self-service onboarding and production provisioning are not complete.
+The Web and Teacher Mobile surfaces provide the self-registration foundation. Development can surface a one-time verification token locally; production email delivery, invitation acceptance, legal notices, support operations, and automated provisioning are not complete. Teacher Mobile never gains school-administration capabilities from this flow.
 
 ### Teacher account provisioning — implemented foundation
 

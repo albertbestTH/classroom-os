@@ -185,3 +185,7 @@ Volume removal is deliberately not part of any package script.
 Playwright uses `db:bootstrap:auth` for synthetic accounts, enrollments, and a deterministic current-day timetable. `db:e2e:cleanup` removes only the synthetic operational session data and refuses production/non-local databases. CI installs Chromium, runs `pnpm e2e`, and then lets the PostgreSQL service be discarded.
 
 Prisma 7.8 with `@prisma/adapter-pg` still emits the `pg` 8.22 deprecation warning when Prisma's internal query-plan interpreter fans out relation work on one adapter transaction connection. Application `Promise.all` calls on transaction clients were removed and hot-path session detail reads were serialized; trace stacks now terminate inside Prisma's `interpretNode`/adapter code with no application concurrent call site. The warning is not suppressed. Recheck after a compatible Prisma adapter release before upgrading to `pg` 9.
+
+## Profile and registration data
+
+`User.phoneNumber` and general `School` contact fields contain tenant-owned profile data. `EmailChangeRequest` and `PendingSchoolRegistration` store SHA-256 verification-token hashes only; registration passwords are Argon2id hashes. Confirmation is single-use and expiry checked. Development may expose a one-time token for synthetic testing, while production must use an approved mail provider and never log it.

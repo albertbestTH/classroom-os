@@ -36,8 +36,5 @@ const teacherItems: NavigationItem[] = [
 
 export function navigationForRole(role: UserRole): NavigationItem[] {
   if (role === "TEACHER") return teacherItems;
-  if (role === "SCHOOL_OWNER") {
-    return [...managerItems, { label: "ตั้งค่า", shortLabel: "ตั้งค่า", href: "/settings" }];
-  }
-  return managerItems;
+  return [...managerItems, { label: "ตั้งค่า", shortLabel: "ตั้งค่า", href: "/settings" }];
 }

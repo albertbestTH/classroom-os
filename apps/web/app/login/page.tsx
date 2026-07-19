@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { getOptionalWebSession, safeCallbackPath } from "@/lib/auth";
 
@@ -28,6 +29,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           ใช้บัญชีของโรงเรียนเพื่อจัดการชั้นเรียน ตารางสอน และผลการเรียน
         </p>
         <LoginForm callbackUrl={callbackUrl} />
+        <p className="mt-6 text-center text-sm text-slate-600">ยังไม่มีโรงเรียน? <Link href="/register" className="font-semibold text-blue-700 underline-offset-4 hover:underline">สมัครใช้งาน</Link></p>
       </section>
     </main>
   );

@@ -1,22 +1,39 @@
-import type { TodayTimetableResult } from "@classroom-os/types";
+import type { CurrentUserResult, TodayTimetableResult } from "@classroom-os/types";
 import Constants from "expo-constants";
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton, AppHeader, Card, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { colors, radius, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { developmentEnvironmentLabel } from "@/lib/environment";
+import { apiRequest } from "@/lib/api-client";
+import { thaiErrorMessage } from "@/lib/api-error";
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <View style={styles.detail}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>;
 }
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, token, updateUser, logout } = useAuth();
+  const [firstName, setFirstName] = useState(user?.firstName ?? "");
+  const [lastName, setLastName] = useState(user?.lastName ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ?? "");
+  const [profileMessage, setProfileMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   const today = useAuthenticatedQuery<TodayTimetableResult>(["today"], "/api/me/today");
   const environment = developmentEnvironmentLabel();
   const initials = `${user?.firstName?.charAt(0) ?? ""}${user?.lastName?.charAt(0) ?? ""}` || "ครู";
+
+  async function saveProfile() {
+    setSaving(true); setProfileMessage("");
+    try {
+      const updated = await apiRequest<CurrentUserResult>("/api/profile", { method: "PATCH", token, body: { firstName, lastName, phoneNumber: phoneNumber || null } });
+      updateUser(updated); setProfileMessage("บันทึกโปรไฟล์แล้ว");
+    } catch (error) { setProfileMessage(thaiErrorMessage(error)); }
+    finally { setSaving(false); }
+  }
 
   return <SafeScreen>
     <AppHeader title="โปรไฟล์" subtitle="ข้อมูลบัญชีครูที่กำลังใช้งาน" />
@@ -34,9 +51,14 @@ export default function ProfileScreen() {
       <Detail label="งานสอน" value={`${user?.assignmentCount ?? 0} รายการ`} />
       <Detail label="ภาคเรียนปัจจุบัน" value={today.data?.currentTerm?.name ?? "ยังไม่กำหนด"} />
     </Card>
+    <SectionHeader title="แก้ไขข้อมูลส่วนตัว" />
     <Card>
-      <Text style={styles.noticeTitle}>การแก้ไขข้อมูลบัญชี</Text>
-      <Text style={styles.notice}>ชื่อทางการ อีเมล รหัสบุคลากร บทบาท และงานสอนจัดการผ่านเว็บโดยผู้มีสิทธิ์ เพื่อป้องกันข้อมูลโรงเรียนคลาดเคลื่อน</Text>
+      <Text style={styles.label}>ชื่อ</Text><TextInput accessibilityLabel="ชื่อ" value={firstName} onChangeText={setFirstName} style={styles.input} />
+      <Text style={styles.label}>นามสกุล</Text><TextInput accessibilityLabel="นามสกุล" value={lastName} onChangeText={setLastName} style={styles.input} />
+      <Text style={styles.label}>เบอร์โทรศัพท์</Text><TextInput accessibilityLabel="เบอร์โทรศัพท์" keyboardType="phone-pad" value={phoneNumber} onChangeText={setPhoneNumber} style={styles.input} />
+      {profileMessage ? <Text accessibilityRole="alert" style={styles.feedback}>{profileMessage}</Text> : null}
+      <AppButton label={saving ? "กำลังบันทึก…" : "บันทึกโปรไฟล์"} disabled={saving || !firstName.trim() || !lastName.trim()} onPress={() => void saveProfile()} />
+      <Text style={styles.notice}>การเปลี่ยนอีเมลต้องยืนยันรหัสผ่านและอีเมลใหม่ จัดการได้ที่หน้าโปรไฟล์บนเว็บ</Text>
     </Card>
     <SectionHeader title="เกี่ยวกับแอป" />
     <Card>
@@ -59,4 +81,6 @@ const styles = StyleSheet.create({
   value: { color: colors.text, fontSize: 16, lineHeight: 23 },
   noticeTitle: { color: colors.primaryDark, fontSize: 17, fontWeight: "800" },
   notice: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.text },
+  feedback: { color: colors.primaryDark, fontSize: 14, fontWeight: "700" },
 });

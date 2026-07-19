@@ -119,3 +119,7 @@ Attendance comparisons group by stable classroom and subject IDs. This keeps cla
 Trend dates are created in `School.timezone`. A date with no qualifying operational session has a nullable percentage and is rendered as a gap, not a fabricated zero. Today's attendance is `(present + late) / eligible rows`; completion is `recorded / eligible rows`. Cancelled sessions are excluded from attendance, while live, completed, missed, scheduled, cancelled, and incomplete states remain visible in the operational status summary.
 
 The App Router page performs authenticated service reads on the server. Recharts is confined to small client visualization components that receive serializable contracts. Each figure has a visible legend or value list, a text summary, and explicit empty behavior; route loading and error boundaries provide skeleton and retry states without exposing internal failures.
+
+## Profile and onboarding boundary
+
+`profile.service` owns self-profile mutations, general school-profile mutations, verified email changes, and new-school registration. Authenticated profile operations use trusted `schoolId` and `userId`; school profile writes reject teachers. Registration is the only pre-tenant path and creates a brand-new tenant plus owner only after verification. Raw verification tokens and passwords never enter audit metadata or token columns.

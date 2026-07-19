@@ -71,13 +71,16 @@ enum TimetableCoverageStatus {
 }
 
 model School {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  code      String   @unique
-  timezone  String   @default("Asia/Bangkok")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  code        String   @unique
+  timezone    String   @default("Asia/Bangkok")
+  email       String?
+  phoneNumber String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   academicYears         AcademicYear[]
   terms                 Term[]
@@ -99,6 +102,7 @@ model School {
   sessionTimelineEvents SessionTimelineEvent[]
   attendanceCorrections AttendanceCorrection[]
   timetableCoverages    TimetableCoverage[]
+  emailChangeRequests   EmailChangeRequest[]
 
   @@index([isActive])
 }
@@ -151,6 +155,7 @@ model User {
   email        String        @unique
   firstName    String
   lastName     String
+  phoneNumber  String?
   role         UserRole
   status       AccountStatus @default(ACTIVE)
   passwordHash String?
@@ -169,8 +174,48 @@ model User {
   cancelledClassSessions    ClassSession[]         @relation("SessionCancelledBy")
   requestedCoverages        TimetableCoverage[]    @relation("CoverageRequester")
   resolvedCoverages         TimetableCoverage[]    @relation("CoverageResolver")
+  emailChangeRequests       EmailChangeRequest[]
 
   @@index([schoolId, role, status])
+}
+
+model PendingSchoolRegistration {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolName   String
+  schoolCode   String
+  timezone     String    @default("Asia/Bangkok")
+  firstName    String
+  lastName     String
+  phoneNumber  String?
+  email        String
+  passwordHash String
+  tokenHash    String    @unique @db.Char(64)
+  expiresAt    DateTime  @db.Timestamptz(3)
+  consumedAt   DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([email, expiresAt])
+  @@index([schoolCode, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model EmailChangeRequest {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId   String    @db.Uuid
+  userId     String    @db.Uuid
+  newEmail   String
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, expiresAt])
+  @@index([newEmail, expiresAt])
+  @@index([expiresAt, consumedAt])
 }
 
 model AuthSession {
