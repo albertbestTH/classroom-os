@@ -40,6 +40,12 @@ Local `.env` files are ignored. Never place production credentials in this repos
 
 The Expo Router teacher application lives in `apps/mobile`. It provides the focused five-tab teacher workflow for today, assigned classes, live sessions and attendance, scores foundation, and profile. See [mobile local development](docs/mobile/local-development.md), [architecture](docs/mobile/architecture.md), and [teacher workflows](docs/mobile/teacher-workflows.md).
 
+The web gradebook and mobile quick-score workflow use the same tenant-scoped assessment and score API. A missing score remains distinct from zero. Approved dated cover/swap requests grant the substitute access to the original timetable entry and session; attendance and scores stay attached to the original teaching assignment. Mobile persists only non-roster timetable/today reads for a 12-hour offline window and never queues mutations silently.
+
+Android development builds use `pnpm --filter mobile android:dev-build`; EAS development/preview APK profiles live in `apps/mobile/eas.json`. The Maestro smoke flow is `pnpm --filter mobile e2e:android` and requires synthetic `MAESTRO_TEST_EMAIL` and `MAESTRO_TEST_PASSWORD` values.
+
+Production readiness gates, privacy limits, health monitoring, and backup/restore expectations are documented in [production readiness](docs/operations/production-readiness.md). The repository is not approved for real student data yet.
+
 To deliberately reset the disposable local database, first stop Compose and remove its volume, then recreate and migrate it:
 
 ```powershell

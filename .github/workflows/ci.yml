@@ -77,6 +77,9 @@ jobs:
       - name: Run authenticated API tests
         run: pnpm api:test
 
+      - name: Run teacher mobile unit tests
+        run: pnpm --filter mobile test
+
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
 

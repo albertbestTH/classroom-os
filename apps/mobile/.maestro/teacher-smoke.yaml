@@ -1,0 +1,19 @@
+appId: com.classroomos.teacher
+name: Teacher login and daily workflow smoke test
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Classroom OS"
+- tapOn: "อีเมล"
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn: "รหัสผ่าน"
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- tapOn: "เข้าสู่ระบบ"
+- assertVisible: "วันนี้"
+- tapOn: "ตารางสอน"
+- assertVisible: "รายวัน"
+- assertVisible: "ทั้งสัปดาห์"
+- tapOn: "คะแนน"
+- assertVisible: "คะแนน"
+- tapOn: "โปรไฟล์"
+- assertVisible: "โปรไฟล์"

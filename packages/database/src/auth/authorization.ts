@@ -1,6 +1,8 @@
 import type { TrustedAuthContext, UserRole } from "@classroom-os/types";
 
 import { getPrismaClient } from "../client.js";
+import { findActiveCoverageAccess } from "../repositories/timetable-coverage.repository.js";
+import { localDateForInstant } from "../services/timezone.js";
 import { authError } from "./auth-errors.js";
 
 type AssignmentRequirement = {
@@ -83,11 +85,24 @@ export async function requireClassSessionAccess(
   const authenticated = requireAuthenticatedUser(context);
   const session = await getPrismaClient().classSession.findFirst({
     where: { id: sessionId, schoolId: authenticated.schoolId },
-    select: { schoolId: true, termId: true, classroomId: true, subjectId: true },
+    select: {
+      schoolId: true, termId: true, classroomId: true, subjectId: true,
+      timetableEntryId: true, scheduledStart: true,
+      school: { select: { timezone: true } },
+    },
   });
   if (!session) throw authError("FORBIDDEN", "The class session is not accessible.");
   if (expectedClassroomId && session.classroomId !== expectedClassroomId) {
     throw authError("FORBIDDEN", "The class session does not belong to this classroom.");
+  }
+  if (authenticated.role === "TEACHER" && session.timetableEntryId && authenticated.teacherId) {
+    const coverage = await findActiveCoverageAccess(getPrismaClient(), {
+      schoolId: authenticated.schoolId,
+      teacherId: authenticated.teacherId,
+      timetableEntryId: session.timetableEntryId,
+      localDate: new Date(`${localDateForInstant(session.scheduledStart, session.school.timezone)}T00:00:00.000Z`),
+    });
+    if (coverage) return;
   }
   await requireTeachingAssignment(authenticated, session);
 }
@@ -151,6 +166,7 @@ export async function requireStudentAccess(
 export async function requireTimetableEntryAccess(
   context: TrustedAuthContext | null | undefined,
   timetableEntryId: string,
+  localDate?: string,
 ): Promise<void> {
   const authenticated = requireAuthenticatedUser(context);
   const entry = await getPrismaClient().timetableEntry.findFirst({
@@ -158,6 +174,19 @@ export async function requireTimetableEntryAccess(
     select: { schoolId: true, termId: true, classroomId: true, subjectId: true },
   });
   if (!entry) throw authError("FORBIDDEN", "The timetable entry is not accessible.");
+  if (
+    authenticated.role === "TEACHER" && authenticated.teacherId && localDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(localDate) &&
+    !Number.isNaN(new Date(`${localDate}T00:00:00.000Z`).getTime())
+  ) {
+    const coverage = await findActiveCoverageAccess(getPrismaClient(), {
+      schoolId: authenticated.schoolId,
+      teacherId: authenticated.teacherId,
+      timetableEntryId,
+      localDate: new Date(`${localDate}T00:00:00.000Z`),
+    });
+    if (coverage) return;
+  }
   await requireTeachingAssignment(authenticated, entry);
 }
 
@@ -178,11 +207,15 @@ export async function requireAssessmentAccess(
   const authenticated = requireAuthenticatedUser(context);
   const assessment = await getPrismaClient().assessment.findFirst({
     where: { id: assessmentId, schoolId: authenticated.schoolId },
-    select: { schoolId: true, termId: true, classroomId: true, subjectId: true },
+    select: { schoolId: true, termId: true, classroomId: true, subjectId: true, classSessionId: true },
   });
   if (!assessment) throw authError("FORBIDDEN", "The assessment is not accessible.");
   if (expectedClassroomId && assessment.classroomId !== expectedClassroomId) {
     throw authError("FORBIDDEN", "The assessment does not belong to this classroom.");
+  }
+  if (assessment.classSessionId) {
+    await requireClassSessionAccess(authenticated, assessment.classSessionId, assessment.classroomId);
+    return;
   }
   await requireTeachingAssignment(authenticated, assessment);
 }

@@ -90,6 +90,12 @@ Timetable and session rows now store `teachingAssignmentId` in addition to their
 
 School-local dates are calculated with `Intl` and `School.timezone`, then converted to UTC instants for persistence. Materialization accepts a local `YYYY-MM-DD`, verifies the timetable weekday and term boundary, derives start/end instants from the entry's wall-clock times, and relies on `(timetableEntryId, scheduledStart)` uniqueness to reject a duplicate daily session.
 
+`TimetableCoverage` adds a dated, audited approval boundary for cover and swap requests. It never rewrites the original `TimetableEntry`, `TeachingAssignment`, or class ownership. Once accepted, the substitute receives access only to the covered entry/session on that school-local date; a swap grants the reciprocal dated access as well. Acceptance checks regular timetable and approved-coverage overlaps. Today views replace covered-away entries with the effective entry, while attendance and scores continue to use the original classroom, subject, enrollment, and assignment IDs.
+
+The web gradebook and mobile quick-score screen read and mutate the same assessment/score services. Missing scores serialize as `null`, while an earned zero remains numeric zero. Mobile query persistence is a presentation cache, not a second source of truth: only today/timetable/assignment/coverage reads are stored for up to 12 hours, account transitions clear the cache, and mutations are never replayed automatically.
+
+Operational readiness includes a database-aware `/api/health` endpoint, sanitized request correlation IDs, and minimal structured 5xx logs. See `docs/operations/production-readiness.md`; these controls are a baseline and do not authorize real-student production use.
+
 `SessionTimelineEvent` is a classroom-facing stream for start, attendance update/correction, end, and cancellation events. It stores only sanitized identifiers, timestamps, state changes, and counts. `AuditLog` is separate: it records mutation accountability across all domain entities and is not presented as the teacher's classroom narrative. A partial unique index on live sessions closes the concurrent-start race for each teacher.
 
 ## Attendance reporting boundary

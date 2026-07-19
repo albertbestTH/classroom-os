@@ -11,17 +11,20 @@ import {
   type TenantScope,
 } from "../tenant.js";
 import { findUnenrolledStudentIdsForSchool } from "./attendance.repository.js";
+import { requireTeachingAssignmentForSchool } from "./account.repository.js";
 import { requireTenantReferencesForSchool } from "./reference.repository.js";
 
 type AssessmentClient = Pick<
   PrismaClient,
   | "assessment"
+  | "authSession"
   | "score"
   | "attendanceRecord"
   | "classSession"
   | "classEnrollment"
   | "term"
   | "teacher"
+  | "teachingAssignment"
   | "classroom"
   | "subject"
   | "user"
@@ -37,6 +40,50 @@ export async function requireAssessmentForSchool(
 
   if (!assessment) throw new TenantRecordNotFoundError("Assessment");
   return assessment;
+}
+
+export async function getGradebookDataForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { teachingAssignmentId: string },
+) {
+  const schoolId = requireSchoolId(input);
+  const teachingAssignmentId = requireRecordId(
+    input.teachingAssignmentId,
+    "teachingAssignmentId",
+  );
+  const assignment = await requireTeachingAssignmentForSchool(client, {
+    schoolId,
+    teachingAssignmentId,
+  });
+  const [assessments, enrollments] = await Promise.all([
+    client.assessment.findMany({
+      where: {
+        schoolId,
+        termId: assignment.termId,
+        classroomId: assignment.classroomId,
+        subjectId: assignment.subjectId,
+        teacherId: assignment.teacherId,
+      },
+      include: { scores: { orderBy: { studentId: "asc" } } },
+      orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    }),
+    client.classEnrollment.findMany({
+      where: {
+        schoolId,
+        termId: assignment.termId,
+        classroomId: assignment.classroomId,
+        isActive: true,
+        leftAt: null,
+      },
+      include: { student: true },
+      orderBy: [
+        { student: { lastName: "asc" } },
+        { student: { firstName: "asc" } },
+        { studentId: "asc" },
+      ],
+    }),
+  ]);
+  return { assignment, assessments, enrollments };
 }
 
 export async function createAssessmentForSchool(

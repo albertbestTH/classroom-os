@@ -2,9 +2,11 @@ import type {
   AssessmentResult,
   BatchServiceResult,
   CreateAssessmentInput,
+  GradebookResult,
   ScoreResult,
   UpdateScoreBatchInput,
 } from "@classroom-os/types";
+import { z } from "zod";
 
 import { getPrismaClient } from "../client.js";
 import { domainError } from "../domain-errors.js";
@@ -12,6 +14,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import {
   createAssessmentForSchool,
   findUnenrolledScoreStudentIdsForSchool,
+  getGradebookDataForSchool,
   requireAssessmentForSchool,
   upsertScoreBatchForSchool,
 } from "../repositories/assessment.repository.js";
@@ -24,6 +27,77 @@ import {
   toAssessmentResult,
   toScoreResult,
 } from "./service-utils.js";
+
+const gradebookSchema = z.object({
+  schoolId: z.string().uuid(),
+  teachingAssignmentId: z.string().uuid(),
+});
+
+export function getGradebook(input: {
+  schoolId: string;
+  teachingAssignmentId: string;
+}): Promise<GradebookResult> {
+  return executeTenantService(input, async () => {
+    const parsed = gradebookSchema.parse(input);
+    const { assignment, assessments, enrollments } = await getGradebookDataForSchool(
+      getPrismaClient(),
+      parsed,
+    );
+    const assessmentResults = assessments.map((assessment) => ({
+      ...toAssessmentResult(assessment),
+      scoreCount: assessment.scores.length,
+    }));
+    const totalMaxScore = assessmentResults.reduce(
+      (total, assessment) => total + assessment.maxScore,
+      0,
+    );
+    return {
+      teachingContext: {
+        academicYearId: assignment.term.academicYear.id,
+        academicYearName: assignment.term.academicYear.name,
+        termId: assignment.termId,
+        termName: assignment.term.name,
+        teachingAssignmentId: assignment.id,
+        teacherId: assignment.teacherId,
+        teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
+        classroomId: assignment.classroomId,
+        classroomName: assignment.classroom.name,
+        subjectId: assignment.subjectId,
+        subjectName: assignment.subject.name,
+      },
+      assessments: assessmentResults,
+      students: enrollments.map(({ student }) => {
+        const scores = assessments.map((assessment) => {
+          const score = assessment.scores.find((item) => item.studentId === student.id);
+          return {
+            assessmentId: assessment.id,
+            value: score?.value.toNumber() ?? null,
+            feedback: score?.feedback ?? null,
+            gradedAt: score?.gradedAt.toISOString() ?? null,
+          };
+        });
+        const earnedScore = scores.reduce((total, score) => total + (score.value ?? 0), 0);
+        const gradedMaxScore = scores.reduce((total, score, index) =>
+          total + (score.value === null ? 0 : (assessmentResults[index]?.maxScore ?? 0)), 0);
+        return {
+          studentId: student.id,
+          studentNumber: student.studentNumber,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          preferredName: student.preferredName,
+          profileImageKey: student.profileImageKey,
+          scores,
+          earnedScore,
+          gradedMaxScore,
+          percentage: gradedMaxScore > 0
+            ? Math.round((earnedScore / gradedMaxScore) * 10_000) / 100
+            : null,
+        };
+      }),
+      totalMaxScore,
+    };
+  });
+}
 
 export function createAssessment(
   input: CreateAssessmentInput,

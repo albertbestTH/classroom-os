@@ -57,6 +57,7 @@ export function SessionScreen({ id }: { id: string }) {
       <Text style={styles.heading}>การเช็กชื่อ</Text>
       <Text style={styles.muted}>บันทึกแล้ว {data.attendanceRecordedCount}/{data.enrolledStudentCount} คน</Text>
       {data.status === "live" ? <AppButton label="เช็กชื่อ" onPress={() => router.push(`/sessions/${id}/attendance?classroomId=${data.classroomId}`)} /> : null}
+      {data.status === "live" ? <AppButton label="คะแนนด่วน" tone="secondary" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${data.teachingAssignmentId}&classroomId=${data.classroomId}`)} /> : null}
     </Card>
     <Card>
       <Text style={styles.heading}>ไทม์ไลน์คาบเรียน</Text>

@@ -26,3 +26,15 @@ pnpm --filter mobile start
 ```
 
 Useful checks are `pnpm --filter mobile typecheck`, `pnpm --filter mobile lint`, and `pnpm --filter mobile test`. Production must use HTTPS and a production API URL supplied by the build environment. Never embed credentials, cookies, or a database URL in the app.
+
+For a native Android development client (Android SDK/Emulator required), run:
+
+```powershell
+pnpm --filter mobile android:dev-build
+```
+
+The first build installs the required SDK/NDK components and can take considerably longer. `apps/mobile/eas.json` also defines internal development and preview APK profiles; deployment credentials and the API URL must be injected by the build environment.
+
+On Windows, CMake used by `react-native-worklets` can exceed the legacy path limit when the repository has a long absolute path. Keep the checkout path short or use a local short pnpm virtual store before building, for example `pnpm install --force --virtual-store-dir C:\.cos-pnpm`. This path is machine-local and must not be committed. For an x86_64 Android Studio emulator, a generated native project can be validated with `gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64`; normal EAS builds create all configured production architectures remotely.
+
+After installing a development build and preparing a synthetic teacher account, install Maestro and run `pnpm --filter mobile e2e:android` with `MAESTRO_TEST_EMAIL` and `MAESTRO_TEST_PASSWORD`. The smoke test clears application state and never uses real student data.

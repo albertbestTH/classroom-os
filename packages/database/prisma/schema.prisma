@@ -58,6 +58,18 @@ enum AssessmentType {
   other
 }
 
+enum TimetableCoverageKind {
+  cover
+  swap
+}
+
+enum TimetableCoverageStatus {
+  pending
+  active
+  declined
+  cancelled
+}
+
 model School {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String
@@ -86,6 +98,7 @@ model School {
   authenticationEvents  AuthenticationEvent[]
   sessionTimelineEvents SessionTimelineEvent[]
   attendanceCorrections AttendanceCorrection[]
+  timetableCoverages    TimetableCoverage[]
 
   @@index([isActive])
 }
@@ -154,6 +167,8 @@ model User {
   sessionTimelineEvents     SessionTimelineEvent[] @relation("SessionTimelineActor")
   attendanceCorrections     AttendanceCorrection[] @relation("AttendanceCorrectionActor")
   cancelledClassSessions    ClassSession[]         @relation("SessionCancelledBy")
+  requestedCoverages        TimetableCoverage[]    @relation("CoverageRequester")
+  resolvedCoverages         TimetableCoverage[]    @relation("CoverageResolver")
 
   @@index([schoolId, role, status])
 }
@@ -211,6 +226,8 @@ model Teacher {
   classSessions       ClassSession[]
   assessments         Assessment[]         @relation("AssessmentTeacher")
   gradedScores        Score[]              @relation("ScoreGrader")
+  requestedCoverages  TimetableCoverage[]  @relation("CoverageOriginalTeacher")
+  assignedCoverages   TimetableCoverage[]  @relation("CoverageSubstituteTeacher")
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId, isActive])
@@ -348,13 +365,15 @@ model TimetableEntry {
   createdAt            DateTime @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime @updatedAt @db.Timestamptz(3)
 
-  school             School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  term               Term               @relation(fields: [termId], references: [id], onDelete: Restrict)
-  teacher            Teacher            @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  classroom          Classroom          @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  subject            Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  teachingAssignment TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
-  classSessions      ClassSession[]
+  school              School              @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term                Term                @relation(fields: [termId], references: [id], onDelete: Restrict)
+  teacher             Teacher             @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  classroom           Classroom           @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  subject             Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teachingAssignment  TeachingAssignment  @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
+  classSessions       ClassSession[]
+  coverages           TimetableCoverage[] @relation("CoverageTimetableEntry")
+  reciprocalCoverages TimetableCoverage[] @relation("CoverageReciprocalEntry")
 
   @@unique([schoolId, termId, weekday, startTime, classroomId])
   @@unique([schoolId, termId, weekday, startTime, teacherId])
@@ -362,6 +381,38 @@ model TimetableEntry {
   @@index([schoolId, teachingAssignmentId, weekday])
   @@index([schoolId, teacherId, weekday])
   @@index([schoolId, classroomId, weekday])
+}
+
+/// A dated cover or swap request. The timetable entry and teaching assignment remain
+/// owned by the original teacher so attendance and scores stay with the original class.
+model TimetableCoverage {
+  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId            String                  @db.Uuid
+  timetableEntryId    String                  @db.Uuid
+  reciprocalEntryId   String?                 @db.Uuid
+  originalTeacherId   String                  @db.Uuid
+  substituteTeacherId String                  @db.Uuid
+  localDate           DateTime                @db.Date
+  kind                TimetableCoverageKind   @default(cover)
+  status              TimetableCoverageStatus @default(pending)
+  reason              String?
+  requestedByUserId   String                  @db.Uuid
+  resolvedByUserId    String?                 @db.Uuid
+  resolvedAt          DateTime?               @db.Timestamptz(3)
+  createdAt           DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(3)
+
+  school            School          @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  timetableEntry    TimetableEntry  @relation("CoverageTimetableEntry", fields: [timetableEntryId], references: [id], onDelete: Restrict)
+  reciprocalEntry   TimetableEntry? @relation("CoverageReciprocalEntry", fields: [reciprocalEntryId], references: [id], onDelete: Restrict)
+  originalTeacher   Teacher         @relation("CoverageOriginalTeacher", fields: [originalTeacherId], references: [id], onDelete: Restrict)
+  substituteTeacher Teacher         @relation("CoverageSubstituteTeacher", fields: [substituteTeacherId], references: [id], onDelete: Restrict)
+  requestedBy       User            @relation("CoverageRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  resolvedBy        User?           @relation("CoverageResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, substituteTeacherId, localDate, status])
+  @@index([schoolId, originalTeacherId, localDate, status])
+  @@index([schoolId, status, createdAt])
 }
 
 model ClassSession {

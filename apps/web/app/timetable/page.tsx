@@ -3,10 +3,12 @@ import {
   listTeachingAssignments,
   listTerms,
   listTimetableEntries,
+  listTimetableCoverages,
 } from "@classroom-os/database";
 
 import { AppShell } from "@/components/app-shell";
 import { TimetableManager } from "@/components/classroom/timetable-manager";
+import { CoverageManager } from "@/components/classroom/coverage-manager";
 import { PageHeader } from "@/components/page-header";
 import { requireWebSession } from "@/lib/auth";
 
@@ -19,12 +21,18 @@ export default async function TimetablePage() {
   ]);
   const currentYear = years.find((year) => year.isCurrent) ?? null;
   const currentTerm = terms.find((term) => term.isCurrent && (!currentYear || term.academicYearId === currentYear.id)) ?? null;
-  const entries = currentTerm ? await listTimetableEntries({
+  const allEntries = currentTerm ? await listTimetableEntries({
     schoolId: context.schoolId,
     termId: currentTerm.id,
-    teacherId: context.role === "TEACHER" ? context.teacherId ?? undefined : undefined,
   }) : [];
+  const entries = context.role === "TEACHER"
+    ? allEntries.filter((entry) => entry.teacherId === context.teacherId)
+    : allEntries;
   const currentAssignments = currentTerm ? assignments.filter((item) => item.termId === currentTerm.id) : [];
+  const coverages = await listTimetableCoverages({
+    schoolId: context.schoolId,
+    teacherId: context.role === "TEACHER" ? context.teacherId ?? undefined : undefined,
+  });
 
   return (
     <AppShell>
@@ -33,7 +41,7 @@ export default async function TimetablePage() {
         title="ตารางสอน"
         description="จัดตารางรายสัปดาห์แยกตามครู ห้องเรียน รายวิชา และงานสอน"
       />
-      {!currentTerm ? <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">กำหนดปีการศึกษาและภาคเรียนปัจจุบันก่อนสร้างตารางสอน</div> : <TimetableManager entries={entries} assignments={currentAssignments} role={context.role} />}
+      {!currentTerm ? <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">กำหนดปีการศึกษาและภาคเรียนปัจจุบันก่อนสร้างตารางสอน</div> : <><TimetableManager entries={entries} assignments={currentAssignments} role={context.role} /><div className="mt-6"><CoverageManager entries={allEntries} coverages={coverages} role={context.role} teacherId={context.teacherId} /></div></>}
     </AppShell>
   );
 }

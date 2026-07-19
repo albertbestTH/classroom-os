@@ -427,6 +427,37 @@ export interface TimetableEntryResult {
   academicYearName: string;
 }
 
+export const TIMETABLE_COVERAGE_KINDS = ["cover", "swap"] as const;
+export type TimetableCoverageKind = (typeof TIMETABLE_COVERAGE_KINDS)[number];
+export const TIMETABLE_COVERAGE_STATUSES = ["pending", "active", "declined", "cancelled"] as const;
+export type TimetableCoverageStatus = (typeof TIMETABLE_COVERAGE_STATUSES)[number];
+
+export interface RequestTimetableCoverageInput {
+  timetableEntryId: string;
+  substituteTeacherId: string;
+  localDate: string;
+  kind: TimetableCoverageKind;
+  reciprocalEntryId?: string | null;
+  reason?: string | null;
+}
+
+export interface TimetableCoverageResult {
+  id: string;
+  schoolId: string;
+  timetableEntryId: string;
+  reciprocalEntryId: string | null;
+  originalTeacherId: string;
+  originalTeacherName: string;
+  substituteTeacherId: string;
+  substituteTeacherName: string;
+  localDate: string;
+  kind: TimetableCoverageKind;
+  status: TimetableCoverageStatus;
+  reason: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 export interface ClassSessionResult {
   id: string;
   schoolId: string;
@@ -519,6 +550,7 @@ export interface TodayClassResult {
   status: TodayClassStatus;
   scheduledStart: string;
   scheduledEnd: string;
+  coverage: TimetableCoverageResult | null;
 }
 
 export interface TodayTimetableResult {
@@ -758,6 +790,37 @@ export interface ScoreResult {
   value: number;
   feedback: string | null;
   gradedAt: string;
+}
+
+export interface GradebookAssessmentResult extends AssessmentResult {
+  scoreCount: number;
+}
+
+export interface GradebookStudentScoreResult {
+  assessmentId: string;
+  value: number | null;
+  feedback: string | null;
+  gradedAt: string | null;
+}
+
+export interface GradebookStudentResult {
+  studentId: string;
+  studentNumber: string;
+  firstName: string;
+  lastName: string;
+  preferredName: string | null;
+  profileImageKey: string | null;
+  scores: GradebookStudentScoreResult[];
+  earnedScore: number;
+  gradedMaxScore: number;
+  percentage: number | null;
+}
+
+export interface GradebookResult {
+  teachingContext: TeachingContext;
+  assessments: GradebookAssessmentResult[];
+  students: GradebookStudentResult[];
+  totalMaxScore: number;
 }
 
 export interface BatchServiceResult<T> {

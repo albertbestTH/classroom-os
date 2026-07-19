@@ -19,6 +19,7 @@ The Sprint 2 schema establishes the PostgreSQL foundation for teacher-led classr
 | `ClassEnrollment` | Places a student in a classroom for one term. |
 | `TeachingAssignment` | Authorizes or describes a teacher–classroom–subject combination for a term. |
 | `TimetableEntry` | Recurring weekly schedule template with weekday, time range, room, teacher, classroom, and subject. |
+| `TimetableCoverage` | Dated cover/swap approval that grants temporary access without changing original class ownership. |
 | `ClassSession` | Dated occurrence of teaching work. It can be generated from a timetable entry or created ad hoc. |
 | `AttendanceRecord` | One student's attendance outcome for one class session. |
 | `Assessment` | Scored activity for a term, classroom, subject, and teacher; optionally created in a class session. |
@@ -57,6 +58,9 @@ erDiagram
     Teacher ||--o{ TimetableEntry : teaches
     Classroom ||--o{ TimetableEntry : attends
     Subject ||--o{ TimetableEntry : covers
+    TimetableEntry ||--o{ TimetableCoverage : delegates
+    Teacher ||--o{ TimetableCoverage : owns
+    Teacher ||--o{ TimetableCoverage : substitutes
 
     TimetableEntry o|--o{ ClassSession : materializes
     Term ||--o{ ClassSession : scopes
@@ -127,10 +131,11 @@ flowchart LR
 
 1. A `TeachingAssignment` establishes who teaches a subject to a classroom during a term.
 2. A `TimetableEntry` captures the recurring weekday, start/end time, room, teacher, class, and subject. Separate uniqueness constraints prevent a teacher or classroom from being double-booked at the same start time.
-3. The application materializes a dated `ClassSession`. The session stores teacher, classroom, subject, and scheduled timestamps as an operational snapshot and may reference the originating timetable entry. Ad hoc sessions leave that reference empty.
-4. The current term's `ClassEnrollment` rows determine the expected roster. Each student can have at most one attendance record per session.
-5. An `Assessment` may reference the session where it was created. Each student can have at most one score per assessment.
-6. Every successful service mutation appends a sanitized `AuditLog` in the same database transaction.
+3. An optional `TimetableCoverage` request delegates one local date. It remains `pending` until the substitute (or a manager) accepts it. Cover and swap acceptance checks timetable conflicts; cancellation/decline does not grant access. The original timetable and teaching assignment are never reassigned.
+4. The application materializes a dated `ClassSession`. The session stores the original teacher, classroom, subject, and scheduled timestamps as an operational snapshot and may reference the originating timetable entry. Ad hoc sessions leave that reference empty.
+5. The current term's `ClassEnrollment` rows determine the expected roster. Each student can have at most one attendance record per session.
+6. An `Assessment` may reference the session where it was created. Each student can have at most one score per assessment; missing remains distinct from zero.
+7. Every successful service mutation appends a sanitized `AuditLog` in the same database transaction.
 
 ## Service-enforced rules
 

@@ -144,13 +144,21 @@ export async function withAuthenticatedApi<T>(
   handler: AuthenticatedHandler<T>,
   successStatus = 200,
 ): Promise<NextResponse<ApiSuccessResponse<T> | ApiErrorResponse>> {
+  const requestId = request.headers.get("x-request-id")?.slice(0, 128) || crypto.randomUUID();
   try {
     if (options.mutation && !request.headers.has("authorization")) assertSameOrigin(request);
     const session = await requireApiSession(request);
     const body = options.json ? await readJsonObject(request, options.maxBytes) : undefined;
-    return apiSuccess(await handler(session, body), successStatus);
+    const response = apiSuccess(await handler(session, body), successStatus);
+    response.headers.set("x-request-id", requestId);
+    return response;
   } catch (error) {
-    return apiError(error);
+    const response = apiError(error);
+    response.headers.set("x-request-id", requestId);
+    if (response.status >= 500) {
+      console.error(JSON.stringify({ level: "error", event: "api.internal_error", requestId, path: request.nextUrl.pathname }));
+    }
+    return response;
   }
 }
 
@@ -158,12 +166,20 @@ export async function withPublicJsonApi<T>(
   request: NextRequest,
   handler: (body: Record<string, unknown>) => Promise<T>,
 ): Promise<NextResponse<ApiSuccessResponse<T> | ApiErrorResponse>> {
+  const requestId = request.headers.get("x-request-id")?.slice(0, 128) || crypto.randomUUID();
   try {
     assertSameOrigin(request);
     const body = await readJsonObject(request);
-    return apiSuccess(await handler(body));
+    const response = apiSuccess(await handler(body));
+    response.headers.set("x-request-id", requestId);
+    return response;
   } catch (error) {
-    return apiError(error);
+    const response = apiError(error);
+    response.headers.set("x-request-id", requestId);
+    if (response.status >= 500) {
+      console.error(JSON.stringify({ level: "error", event: "api.internal_error", requestId, path: request.nextUrl.pathname }));
+    }
+    return response;
   }
 }
 

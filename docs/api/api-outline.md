@@ -25,12 +25,13 @@ Authorization helpers are `requireAuthenticatedUser`, `requireRole`, `requireSch
 | Student | `createStudent`, `updateStudent`, `getStudent`, `listStudents` |
 | Classroom | `createClassroom`, `updateClassroom`, `getClassroom`, `listClassrooms` |
 | Timetable | `createTimetableEntry`, `updateTimetableEntry`, `listTimetableEntries` |
+| Timetable coverage | `requestTimetableCoverage`, `resolveTimetableCoverage`, `listTimetableCoverages` |
 | Today | `getTodayTimetable` |
 | Session | `materializeClassSession`, `startClassSession`, `endClassSession`, `cancelClassSession`, `getClassSession`, `listClassSessionTimeline` |
 | Attendance | `getSessionAttendanceRoster`, `updateAttendanceBatch`, `correctCompletedAttendance` |
 | Attendance report | `getAttendanceReport`, `getAttendanceStudentReport`, `getAttendanceSessionReport`, `createAttendanceReportCsv` |
 | Dashboard | `getDashboardOverview` |
-| Assessment | `createAssessment`, `updateScoreBatch` |
+| Assessment | `createAssessment`, `getGradebook`, `updateScoreBatch` |
 
 Every method requires `schoolId`. At the server boundary, `trustedTenantInput` derives both `schoolId` and `actorUserId` from the session. Raw Prisma clients and generated models are not API results; services return serializable contracts from `@classroom-os/types`.
 
@@ -61,12 +62,13 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `GET|POST /api/students`; `GET|PATCH /api/students/:id`
 - `GET|POST /api/classrooms`; `GET|PATCH /api/classrooms/:id`
 - `GET|POST /api/timetable`; `PATCH /api/timetable/:id`
+- `GET|POST /api/timetable/coverage`; `PATCH /api/timetable/coverage/:id`
 - `POST /api/sessions` (compatibility materialization); `GET /api/sessions/:id`; `POST /start`; `POST /end`; `GET /timeline`
 - `GET|PUT /api/sessions/:id/attendance`; `POST /api/sessions/:id/attendance/corrections`
 - `POST /api/sessions/:id/cancel`
 - `GET /api/reports/attendance`; `GET /students/:id`; `GET /sessions/:id`; `GET /export`
 - `GET /api/dashboard/overview`
-- `POST /api/assessments`; `PUT /api/assessments/:id/scores`
+- `GET|POST /api/assessments`; `PUT /api/assessments/:id/scores`
 - `GET|POST /api/staff`; `PATCH /api/staff/:id/status`; `PUT /teacher-profile`
 - `GET|POST /api/staff/:id/teaching-assignments`; `GET /api/teaching-assignments`
 - `GET /api/staff/:id`
@@ -89,6 +91,7 @@ Creating or marking an academic year current clears the prior current year and a
 ## Operational timetable and session routes
 
 - `GET /api/me/today` returns the visible current-term schedule, next class, completed/missed/cancelled/incomplete-attendance counts, and school timezone. Teachers receive only their own assignment rows.
+- Accepted dated coverage replaces a covered-away row with the effective cover/swap row for that teacher. The result includes coverage metadata, but the timetable/session retains its original teaching assignment so roster, attendance, and scores remain in the original class.
 - `GET|POST /api/timetable` and `PATCH /api/timetable/:id` return display-safe assignment labels and enforce valid assignments plus teacher/classroom interval conflicts.
 - `POST /api/timetable/:id/materialize` accepts `{ "localDate": "YYYY-MM-DD" }`. It derives all trusted context from the timetable entry and returns the existing occurrence on a safe retry.
 - `GET /api/sessions/:id`, `POST /start`, `POST /end`, and `POST /cancel` enforce exact assignment access and the forward-only state graph. Start/end accept optional `expectedUpdatedAt`; live cancellation is manager-only and every cancellation requires a reason.
@@ -114,3 +117,7 @@ After login, all roles redirect to `/`; the server renders the personal Teacher 
 The mobile login route accepts the same validated email/password input as web login but permits only active `TEACHER` accounts. It returns the one-time raw opaque session token and expiry; the database retains only its SHA-256 hash. Native requests send the token as `Authorization: Bearer <token>`. Session validation and logout require a well-formed bearer token, and logout revokes it server-side. Cookie behavior is unchanged for web clients.
 
 Bearer-authenticated native mutations do not depend on browser Origin/CSRF headers. They retain JSON content-type and size limits plus all role, tenant, assignment, lifecycle, and validation checks. Tokens, passwords, hashes, and credentials are excluded from logs and audit metadata.
+
+## Gradebook synchronization
+
+`GET /api/assessments?teachingAssignmentId=...` returns the exact-assignment gradebook for web and mobile. A substitute may add `classSessionId` when accessing a covered live session; the server validates dated session access and that its assignment matches. Mobile quick score creates an optional session-linked participation assessment and writes through the same `PUT /api/assessments/:id/scores` command used by web. No client-local gradebook is authoritative, missing values are `null`, and numeric zero is preserved.

@@ -1,4 +1,4 @@
-import type { ClassroomResult, TeachingAssignmentResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
+import type { ClassroomResult, TeachingAssignmentResult, TimetableCoverageResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -20,15 +20,16 @@ const weekdays = [
 ] as const;
 
 export function ClassesScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const [view, setView] = useState<"day" | "week">("day");
   const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
-  const [assignments, timetable, classrooms, today] = useQueries({ queries: [
+  const [assignments, timetable, classrooms, today, coverages] = useQueries({ queries: [
     { queryKey: ["assignments"], queryFn: () => apiRequest<TeachingAssignmentResult[]>("/api/teaching-assignments", { token }) },
     { queryKey: ["timetable"], queryFn: () => apiRequest<TimetableEntryResult[]>("/api/timetable", { token }) },
     { queryKey: ["classrooms"], queryFn: () => apiRequest<ClassroomResult[]>("/api/classrooms", { token }) },
     { queryKey: ["today"], queryFn: () => apiRequest<TodayTimetableResult>("/api/me/today", { token }) },
+    { queryKey: ["timetable-coverages"], queryFn: () => apiRequest<TimetableCoverageResult[]>("/api/timetable/coverage", { token }) },
   ] });
   const start = useMutation({
     mutationFn: async (item: TodayClassResult) => {
@@ -40,21 +41,38 @@ export function ClassesScreen() {
       router.push(`/sessions/${session.id}`);
     },
   });
+  const resolveCoverage = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "active" | "declined" }) =>
+      apiRequest<TimetableCoverageResult>(`/api/timetable/coverage/${id}`, { method: "PATCH", token, body: { status } }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["timetable-coverages"] }),
+        queryClient.invalidateQueries({ queryKey: ["today"] }),
+      ]);
+    },
+  });
 
-  const isLoading = assignments.isLoading || timetable.isLoading || classrooms.isLoading || today.isLoading;
+  const isLoading = assignments.isLoading || timetable.isLoading || classrooms.isLoading || today.isLoading || coverages.isLoading;
   if (isLoading) return <LoadingSkeleton />;
-  const error = assignments.error ?? timetable.error ?? classrooms.error ?? today.error;
-  if (error) return <SafeScreen><ErrorState message={thaiErrorMessage(error)} onRetry={() => { void assignments.refetch(); void timetable.refetch(); void classrooms.refetch(); void today.refetch(); }} /></SafeScreen>;
+  const error = assignments.error ?? timetable.error ?? classrooms.error ?? today.error ?? coverages.error;
+  if (error) return <SafeScreen><ErrorState message={thaiErrorMessage(error)} onRetry={() => { void assignments.refetch(); void timetable.refetch(); void classrooms.refetch(); void today.refetch(); void coverages.refetch(); }} /></SafeScreen>;
 
-  const entries = [...(timetable.data ?? [])].filter((entry) => entry.isActive && entry.weekday >= 1 && entry.weekday <= 5).sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime));
+  const entries = [...new Map([
+    ...(timetable.data ?? []),
+    ...(today.data?.classes.map((item) => item.timetableEntry) ?? []),
+  ].map((entry) => [entry.id, entry])).values()]
+    .filter((entry) => entry.isActive && entry.weekday >= 1 && entry.weekday <= 5)
+    .sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime));
   const todayWeekday = new Date(`${today.data!.localDate}T12:00:00Z`).getUTCDay();
   const activeWeekday = selectedWeekday ?? (todayWeekday >= 1 && todayWeekday <= 5 ? todayWeekday : 1);
   const visibleDays = view === "week" ? weekdays : weekdays.filter((day) => day.value === activeWeekday);
-  const refreshing = assignments.isRefetching || timetable.isRefetching || classrooms.isRefetching || today.isRefetching;
-  const refresh = () => { void assignments.refetch(); void timetable.refetch(); void classrooms.refetch(); void today.refetch(); };
+  const refreshing = assignments.isRefetching || timetable.isRefetching || classrooms.isRefetching || today.isRefetching || coverages.isRefetching;
+  const refresh = () => { void assignments.refetch(); void timetable.refetch(); void classrooms.refetch(); void today.refetch(); void coverages.refetch(); };
+  const incomingCoverages = coverages.data?.filter((item) => item.status === "pending" && item.substituteTeacherId === user?.teacherId) ?? [];
 
   return <SafeScreen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
     <AppHeader title="ตารางสอน" subtitle="คาบเรียน ห้องเรียน และ Live Class อยู่ในที่เดียว" />
+    {incomingCoverages.length ? <View style={styles.day}><SectionHeader title="คำขอสอนแทน" action={<StatusBadge label={`${incomingCoverages.length} รายการ`} tone="live" />} />{incomingCoverages.map((item) => <Card key={item.id}><Text style={styles.classroom}>{item.kind === "swap" ? "คำขอสลับคาบ" : "คำขอฝากสอน"}</Text><Text style={styles.subject}>{item.localDate} · จาก {item.originalTeacherName}</Text>{item.reason ? <Text style={styles.meta}>{item.reason}</Text> : null}<AppButton label="ยอมรับ" onPress={() => resolveCoverage.mutate({ id: item.id, status: "active" })} disabled={resolveCoverage.isPending} /><AppButton label="ปฏิเสธ" tone="secondary" onPress={() => resolveCoverage.mutate({ id: item.id, status: "declined" })} disabled={resolveCoverage.isPending} /></Card>)}</View> : null}
     <View accessibilityRole="tablist" style={styles.viewSwitch}>
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === "day" }} onPress={() => setView("day")} style={[styles.viewOption, view === "day" && styles.viewOptionActive]}><Text style={[styles.viewText, view === "day" && styles.viewTextActive]}>รายวัน</Text></Pressable>
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === "week" }} onPress={() => setView("week")} style={[styles.viewOption, view === "week" && styles.viewOptionActive]}><Text style={[styles.viewText, view === "week" && styles.viewTextActive]}>ทั้งสัปดาห์</Text></Pressable>
@@ -63,6 +81,7 @@ export function ClassesScreen() {
       {weekdays.map((day) => <Pressable key={day.value} accessibilityRole="button" accessibilityState={{ selected: activeWeekday === day.value }} accessibilityLabel={`ดูตาราง${day.label}`} onPress={() => setSelectedWeekday(day.value)} style={[styles.dayOption, activeWeekday === day.value && styles.dayOptionActive]}><Text style={[styles.dayText, activeWeekday === day.value && styles.dayTextActive]}>{day.label.replace("วัน", "")}</Text></Pressable>)}
     </ScrollView> : null}
     {start.error ? <Text accessibilityRole="alert" style={styles.error}>{thaiErrorMessage(start.error)}</Text> : null}
+    {resolveCoverage.error ? <Text accessibilityRole="alert" style={styles.error}>{thaiErrorMessage(resolveCoverage.error)}</Text> : null}
     {entries.length ? visibleDays.map((day) => {
       const dailyEntries = entries.filter((entry) => entry.weekday === day.value);
       if (!dailyEntries.length) return view === "day" ? <EmptyState key={day.value} title={`${day.label}ไม่มีคาบสอน`} description="เลือกวันอื่นหรือดูตารางทั้งสัปดาห์" /> : null;

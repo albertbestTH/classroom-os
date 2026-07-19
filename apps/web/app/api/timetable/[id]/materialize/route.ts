@@ -15,11 +15,12 @@ export async function POST(request: NextRequest, route: TimetableRouteContext) {
     { mutation: true, json: true },
     async ({ context }, body = {}) => {
       const { id } = await route.params;
-      await requireTimetableEntryAccess(context, id);
+      const localDate = requiredString(body, "localDate");
+      await requireTimetableEntryAccess(context, id, localDate);
       return materializeClassSession(
         trustedTenantInput(context, {
           timetableEntryId: id,
-          localDate: requiredString(body, "localDate"),
+          localDate,
         }),
       );
     },
