@@ -18,4 +18,10 @@ describe("role-based navigation", () => {
     expect(hrefs).toEqual(["/", "/classrooms", "/timetable", "/live", "/attendance", "/gradebook", "/reports", "/documents", "/profile"]);
     expect(hrefs).not.toEqual(expect.arrayContaining(["/staff", "/subjects", "/academic-years", "/terms", "/import", "/settings"]));
   });
+
+  it("gives personal owners teacher work plus self-setup without staff administration", () => {
+    const hrefs = navigationForRole("SCHOOL_OWNER", "PERSONAL").map(({ href }) => href);
+    expect(hrefs).toEqual(expect.arrayContaining(["/students", "/classrooms", "/subjects", "/personal-setup", "/timetable", "/live", "/profile"]));
+    expect(hrefs).not.toEqual(expect.arrayContaining(["/staff", "/import"]));
+  });
 });

@@ -40,7 +40,8 @@ export async function requireAdminWebSession(): Promise<ResolvedSessionResult> {
 
 export async function requireTeacherWebSession(): Promise<ResolvedSessionResult> {
   const session = await requireWebSession();
-  if (session.context.role !== "TEACHER") redirect("/");
+  const personalTeacherOwner = session.user.workspaceType === "PERSONAL" && session.context.role === "SCHOOL_OWNER" && Boolean(session.context.teacherId);
+  if (session.context.role !== "TEACHER" && !personalTeacherOwner) redirect("/");
   return session;
 }
 

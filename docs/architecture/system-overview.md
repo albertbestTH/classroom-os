@@ -123,3 +123,5 @@ The App Router page performs authenticated service reads on the server. Recharts
 ## Profile and onboarding boundary
 
 `profile.service` owns self-profile mutations, general school-profile mutations, verified email changes, and new-school registration. Authenticated profile operations use trusted `schoolId` and `userId`; school profile writes reject teachers. Registration is the only pre-tenant path and creates a brand-new tenant plus owner only after verification. Raw verification tokens and passwords never enter audit metadata or token columns.
+
+Personal registration marks the tenant `PERSONAL` and creates a linked teacher identity in the same transaction. Server session results carry this trusted workspace type. Web selects personal navigation and teacher-scoped dashboard reads; Mobile permits only a personal owner with that linked teacher identity and never enables school-administration surfaces.

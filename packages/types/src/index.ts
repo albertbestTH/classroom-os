@@ -1,6 +1,9 @@
 export const USER_ROLES = ["SCHOOL_OWNER", "ADMIN", "TEACHER"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export const WORKSPACE_TYPES = ["SCHOOL", "PERSONAL"] as const;
+export type WorkspaceType = (typeof WORKSPACE_TYPES)[number];
+
 export const ACCOUNT_STATUSES = ["ACTIVE", "DISABLED"] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
@@ -21,6 +24,7 @@ export interface TrustedAuthContext {
 }
 
 export interface CurrentUserResult extends TrustedAuthContext {
+  workspaceType: WorkspaceType;
   email: string;
   firstName: string;
   lastName: string;
@@ -60,6 +64,7 @@ export interface SchoolProfileResult {
   email: string | null;
   phoneNumber: string | null;
   address: string | null;
+  workspaceType: WorkspaceType;
 }
 
 export interface UpdateSchoolProfileInput {
@@ -70,8 +75,9 @@ export interface UpdateSchoolProfileInput {
 }
 
 export interface RegisterSchoolInput {
-  schoolName: string;
-  schoolCode: string;
+  workspaceType?: WorkspaceType;
+  schoolName?: string;
+  schoolCode?: string;
   firstName: string;
   lastName: string;
   phoneNumber?: string | null;
@@ -87,6 +93,7 @@ export interface SchoolRegistrationResult {
   schoolId: string;
   ownerUserId: string;
   email: string;
+  workspaceType: WorkspaceType;
 }
 
 export interface MobileSessionResult {

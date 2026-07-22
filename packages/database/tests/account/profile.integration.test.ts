@@ -58,4 +58,14 @@ describe("profile, school profile, and self-registration", () => {
     await expect(prisma.user.findUniqueOrThrow({ where: { id: result.ownerUserId } })).resolves.toMatchObject({ role: "SCHOOL_OWNER", email });
     await expect(confirmSchoolRegistration({ token: request.developmentToken! })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("creates a personal tenant with an owner-linked teacher profile", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8); const email = `synthetic-profile-personal-${suffix}@example.test`;
+    const request = await requestSchoolRegistration({ workspaceType: "PERSONAL", firstName: "ครู", lastName: "ส่วนตัว", email, password: "Synthetic!Personal2026" });
+    const result = await confirmSchoolRegistration({ token: request.developmentToken! }); schools.add(result.schoolId);
+    expect(result.workspaceType).toBe("PERSONAL");
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: result.ownerUserId }, include: { school: true, teacherProfile: true } });
+    expect(user).toMatchObject({ role: "SCHOOL_OWNER", school: { workspaceType: "PERSONAL" }, teacherProfile: { employeeCode: "OWNER", isActive: true } });
+    expect(user.teacherProfile?.schoolId).toBe(result.schoolId);
+  });
 });

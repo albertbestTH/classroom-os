@@ -127,3 +127,5 @@ Today's attendance percentage is `(present + late) / eligible attendance rows`. 
 Teachers can update their own name and phone number on Web and Teacher Mobile. Email changes require the current password plus a short-lived verification token and revoke all active sessions after confirmation. Owners and admins can update only the general school profile on Web; owner/security controls remain separate.
 
 Public registration creates a new school tenant and its first `SCHOOL_OWNER`. It never joins an existing school. Local development returns the one-time verification token for synthetic end-to-end testing; production requires an approved email delivery integration before onboarding real schools.
+
+Registration also supports a `PERSONAL` workspace for an individual teacher. It creates a private tenant, owner account, and linked teacher profile together. Web provides compact self-setup for academic context and teaching assignments; Teacher Mobile reads and mutates the same canonical timetable, sessions, attendance, and scores without exposing staff administration.

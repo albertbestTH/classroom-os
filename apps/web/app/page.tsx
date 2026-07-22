@@ -29,8 +29,8 @@ function toUrlSearchParams(values: Record<string, string | string[] | undefined>
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const [{ context, user }, query] = await Promise.all([requireWebSession(), searchParams]);
-  const overview = await getDashboardOverview({ schoolId: context.schoolId, auth: context, filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)) });
-  const isTeacher = context.role === "TEACHER";
+  const overview = await getDashboardOverview({ schoolId: context.schoolId, auth: user.workspaceType === "PERSONAL" ? { ...context, role: "TEACHER" as const } : context, filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)) });
+  const isTeacher = context.role === "TEACHER" || user.workspaceType === "PERSONAL";
   const dateLabel = new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeZone: overview.timezone }).format(new Date());
 
   return (

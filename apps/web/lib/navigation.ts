@@ -1,4 +1,4 @@
-import type { UserRole } from "@classroom-os/types";
+import type { CurrentUserResult, UserRole, WorkspaceType } from "@classroom-os/types";
 
 export type NavigationItem = {
   label: string;
@@ -34,7 +34,23 @@ const teacherItems: NavigationItem[] = [
   { label: "โปรไฟล์", shortLabel: "โปรไฟล์", href: "/profile" },
 ];
 
-export function navigationForRole(role: UserRole): NavigationItem[] {
+const personalItems: NavigationItem[] = [
+  teacherItems[0]!,
+  { label: "นักเรียนของฉัน", shortLabel: "นักเรียน", href: "/students" },
+  teacherItems[1]!,
+  { label: "รายวิชาของฉัน", shortLabel: "วิชา", href: "/subjects" },
+  { label: "ปีและภาคเรียน", shortLabel: "ภาคเรียน", href: "/academic-years" },
+  { label: "ตั้งค่างานสอน", shortLabel: "งานสอน", href: "/personal-setup" },
+  teacherItems[2]!, teacherItems[3]!, teacherItems[4]!, teacherItems[5]!, teacherItems[6]!, teacherItems[8]!,
+  { label: "ตั้งค่าพื้นที่ส่วนตัว", shortLabel: "ตั้งค่า", href: "/settings" },
+];
+
+export function navigationForRole(role: UserRole, workspaceType: WorkspaceType = "SCHOOL"): NavigationItem[] {
+  if (workspaceType === "PERSONAL" && role === "SCHOOL_OWNER") return personalItems;
   if (role === "TEACHER") return teacherItems;
   return [...managerItems, { label: "ตั้งค่า", shortLabel: "ตั้งค่า", href: "/settings" }];
+}
+
+export function navigationForUser(user: Pick<CurrentUserResult, "role" | "workspaceType">): NavigationItem[] {
+  return navigationForRole(user.role, user.workspaceType);
 }

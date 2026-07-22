@@ -189,3 +189,5 @@ Prisma 7.8 with `@prisma/adapter-pg` still emits the `pg` 8.22 deprecation warni
 ## Profile and registration data
 
 `User.phoneNumber` and general `School` contact fields contain tenant-owned profile data. `EmailChangeRequest` and `PendingSchoolRegistration` store SHA-256 verification-token hashes only; registration passwords are Argon2id hashes. Confirmation is single-use and expiry checked. Development may expose a one-time token for synthetic testing, while production must use an approved mail provider and never log it.
+
+`WorkspaceType` defaults existing and new institutional tenants to `SCHOOL`. A `PERSONAL` confirmation creates both `SCHOOL_OWNER` and its linked `Teacher` row transactionally. The technical tenant root remains `School` so every existing tenant-first query, unique constraint, audit record, and teaching-assignment boundary continues to apply.

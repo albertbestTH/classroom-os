@@ -16,6 +16,11 @@ enum UserRole {
   TEACHER      @map("teacher")
 }
 
+enum WorkspaceType {
+  SCHOOL
+  PERSONAL
+}
+
 enum AccountStatus {
   ACTIVE
   DISABLED
@@ -71,16 +76,17 @@ enum TimetableCoverageStatus {
 }
 
 model School {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  code        String   @unique
-  timezone    String   @default("Asia/Bangkok")
-  email       String?
-  phoneNumber String?
-  address     String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  code          String        @unique
+  timezone      String        @default("Asia/Bangkok")
+  email         String?
+  phoneNumber   String?
+  address       String?
+  workspaceType WorkspaceType @default(SCHOOL)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   academicYears         AcademicYear[]
   terms                 Term[]
@@ -180,20 +186,21 @@ model User {
 }
 
 model PendingSchoolRegistration {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolName   String
-  schoolCode   String
-  timezone     String    @default("Asia/Bangkok")
-  firstName    String
-  lastName     String
-  phoneNumber  String?
-  email        String
-  passwordHash String
-  tokenHash    String    @unique @db.Char(64)
-  expiresAt    DateTime  @db.Timestamptz(3)
-  consumedAt   DateTime? @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolName    String
+  schoolCode    String
+  workspaceType WorkspaceType @default(SCHOOL)
+  timezone      String        @default("Asia/Bangkok")
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  email         String
+  passwordHash  String
+  tokenHash     String        @unique @db.Char(64)
+  expiresAt     DateTime      @db.Timestamptz(3)
+  consumedAt    DateTime?     @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   @@index([email, expiresAt])
   @@index([schoolCode, expiresAt])

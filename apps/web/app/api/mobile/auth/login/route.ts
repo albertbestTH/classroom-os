@@ -12,7 +12,9 @@ export async function POST(request: NextRequest) {
       { email: requiredString(body, "email"), password: requiredString(body, "password") },
       getClientIp(request.headers),
     );
-    if (session.user.role !== "TEACHER") {
+    const canUseTeacherMobile = session.user.role === "TEACHER" ||
+      (session.user.workspaceType === "PERSONAL" && session.user.role === "SCHOOL_OWNER" && Boolean(session.user.teacherId));
+    if (!canUseTeacherMobile) {
       await revokeServerSession(session.token);
       throw authError("FORBIDDEN", "School administration is available on the web application.");
     }

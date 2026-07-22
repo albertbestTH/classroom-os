@@ -34,14 +34,18 @@ const schoolProfileSchema = z.object({
   address: z.string().trim().max(500).nullable().optional(),
 });
 const registrationSchema = z.object({
-  schoolName: name,
-  schoolCode: z.string().trim().toUpperCase().min(2).max(30).regex(/^[A-Z0-9_-]+$/),
+  workspaceType: z.enum(["SCHOOL", "PERSONAL"]).default("SCHOOL"),
+  schoolName: name.optional(),
+  schoolCode: z.string().trim().toUpperCase().min(2).max(30).regex(/^[A-Z0-9_-]+$/).optional(),
   firstName: name,
   lastName: name,
   phoneNumber: phone,
   email,
   password: z.string().min(12).max(128)
     .regex(/[a-z]/).regex(/[A-Z]/).regex(/\d/).regex(/[^A-Za-z0-9]/),
+}).superRefine((value, context) => {
+  if (value.workspaceType === "SCHOOL" && !value.schoolName) context.addIssue({ code: "custom", path: ["schoolName"], message: "School name is required." });
+  if (value.workspaceType === "SCHOOL" && !value.schoolCode) context.addIssue({ code: "custom", path: ["schoolCode"], message: "School code is required." });
 });
 const emailChangeSchema = z.object({ newEmail: email, currentPassword: z.string().min(1).max(1024) });
 
@@ -66,13 +70,13 @@ async function currentUser(userId: string, schoolId: string): Promise<CurrentUse
   const user = await prisma.user.findFirst({
     where: { id: userId, schoolId },
     include: {
-      school: { select: { name: true } },
+      school: { select: { name: true, workspaceType: true } },
       teacherProfile: { select: { id: true, employeeCode: true, _count: { select: { teachingAssignments: true } } } },
     },
   });
   if (!user) throw domainError("NOT_FOUND", "The account was not found for this school.");
   return {
-    userId: user.id, schoolId: user.schoolId, role: user.role,
+    userId: user.id, schoolId: user.schoolId, role: user.role, workspaceType: user.school.workspaceType,
     teacherId: user.teacherProfile?.id ?? null, email: user.email,
     firstName: user.firstName, lastName: user.lastName, phoneNumber: user.phoneNumber,
     schoolName: user.school.name, employeeCode: user.teacherProfile?.employeeCode ?? null,
@@ -139,7 +143,7 @@ export function getSchoolProfile(auth: TrustedAuthContext): Promise<SchoolProfil
     if (auth.role === "TEACHER") throw domainError("TENANT_ACCESS_DENIED", "School administration access is required.");
     const school = await getPrismaClient().school.findUnique({ where: { id: auth.schoolId } });
     if (!school) throw domainError("NOT_FOUND", "The school was not found.");
-    return { id: school.id, name: school.name, code: school.code, timezone: school.timezone, email: school.email, phoneNumber: school.phoneNumber, address: school.address };
+    return { id: school.id, name: school.name, code: school.code, timezone: school.timezone, email: school.email, phoneNumber: school.phoneNumber, address: school.address, workspaceType: school.workspaceType };
   });
 }
 
@@ -160,12 +164,15 @@ export function requestSchoolRegistration(input: RegisterSchoolInput): Promise<V
   return withDomainErrors(async () => {
     const parsed = registrationSchema.parse(input);
     const prisma = getPrismaClient();
+    const personalSuffix = randomBytes(8).toString("hex").toUpperCase();
+    const schoolName = parsed.workspaceType === "PERSONAL" ? `พื้นที่สอนของ ${parsed.firstName}` : parsed.schoolName!;
+    const schoolCode = parsed.workspaceType === "PERSONAL" ? `PERSONAL_${personalSuffix}` : parsed.schoolCode!;
     if (await prisma.user.findUnique({ where: { email: parsed.email }, select: { id: true } })) throw domainError("CONFLICT", "This email is already in use.");
-    if (await prisma.school.findUnique({ where: { code: parsed.schoolCode }, select: { id: true } })) throw domainError("CONFLICT", "This school code is already in use.");
+    if (await prisma.school.findUnique({ where: { code: schoolCode }, select: { id: true } })) throw domainError("CONFLICT", "This school code is already in use.");
     const issued = issueToken();
     const { password, ...registration } = parsed;
-    await prisma.pendingSchoolRegistration.deleteMany({ where: { consumedAt: null, OR: [{ email: parsed.email }, { schoolCode: parsed.schoolCode }] } });
-    await prisma.pendingSchoolRegistration.create({ data: { ...registration, passwordHash: await hashPassword(password), tokenHash: issued.hash, expiresAt: issued.expiresAt } });
+    await prisma.pendingSchoolRegistration.deleteMany({ where: { consumedAt: null, OR: [{ email: parsed.email }, { schoolCode }] } });
+    await prisma.pendingSchoolRegistration.create({ data: { ...registration, schoolName, schoolCode, passwordHash: await hashPassword(password), tokenHash: issued.hash, expiresAt: issued.expiresAt } });
     return verificationResult(issued.value, issued.expiresAt);
   });
 }
@@ -179,11 +186,14 @@ export function confirmSchoolRegistration(input: ConfirmSchoolRegistrationInput)
     return prisma.$transaction(async (tx) => {
       if (await tx.user.findUnique({ where: { email: pending.email }, select: { id: true } })) throw domainError("CONFLICT", "This email is already in use.");
       if (await tx.school.findUnique({ where: { code: pending.schoolCode }, select: { id: true } })) throw domainError("CONFLICT", "This school code is already in use.");
-      const school = await tx.school.create({ data: { name: pending.schoolName, code: pending.schoolCode, timezone: pending.timezone, email: pending.email } });
+      const school = await tx.school.create({ data: { name: pending.schoolName, code: pending.schoolCode, workspaceType: pending.workspaceType, timezone: pending.timezone, email: pending.email } });
       const owner = await tx.user.create({ data: { schoolId: school.id, email: pending.email, firstName: pending.firstName, lastName: pending.lastName, phoneNumber: pending.phoneNumber, role: "SCHOOL_OWNER", passwordHash: pending.passwordHash } });
+      if (pending.workspaceType === "PERSONAL") {
+        await tx.teacher.create({ data: { schoolId: school.id, userId: owner.id, employeeCode: "OWNER", firstName: owner.firstName, lastName: owner.lastName } });
+      }
       await tx.pendingSchoolRegistration.update({ where: { id: pending.id }, data: { consumedAt: new Date() } });
       await tx.auditLog.create({ data: { schoolId: school.id, actorUserId: owner.id, action: "school.registered", entityType: "School", entityId: school.id, metadata: {} } });
-      return { schoolId: school.id, ownerUserId: owner.id, email: owner.email };
+      return { schoolId: school.id, ownerUserId: owner.id, email: owner.email, workspaceType: school.workspaceType };
     });
   });
 }

@@ -128,3 +128,4 @@ Bearer-authenticated native mutations do not depend on browser Origin/CSRF heade
 - `POST /api/profile/email-change` requires the current password; `/confirm` consumes a short-lived token and revokes sessions.
 - `GET|PATCH /api/school-profile` is limited to owner/admin and accepts general contact data only.
 - `POST /api/registration` requests a new-school registration; `/confirm` creates the isolated school and first owner. Public mutations are rate-limited. Existing-school membership remains invitation-only.
+- Registration accepts `workspaceType: SCHOOL | PERSONAL`. `PERSONAL` does not accept a client-authoritative tenant code; confirmation generates an isolated tenant and linked teacher identity. The resulting owner may authenticate to Teacher Mobile, which continues to expose teacher operations only.

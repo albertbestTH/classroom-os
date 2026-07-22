@@ -269,7 +269,7 @@ export async function assignTeacherToClass(
         schoolId: auth.schoolId,
         userId: assignment.userId,
       });
-      if (user.role !== "TEACHER" || !user.teacherProfile?.isActive) {
+      if (!user.teacherProfile?.isActive || !["TEACHER", "SCHOOL_OWNER"].includes(user.role)) {
         throw domainError("VALIDATION_ERROR", "An active teacher profile is required.");
       }
       await requireTenantReferencesForSchool(transaction, {

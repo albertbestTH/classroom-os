@@ -52,11 +52,12 @@ function mapCurrentUser(record: {
   lastName: string;
   phoneNumber: string | null;
   role: CurrentUserResult["role"];
-  school: { name: string };
+  school: { name: string; workspaceType: CurrentUserResult["workspaceType"] };
   teacherProfile: { id: string; employeeCode: string; _count: { teachingAssignments: number } } | null;
 }): CurrentUserResult {
   return {
     userId: record.id,
+    workspaceType: record.school.workspaceType,
     schoolId: record.schoolId,
     role: record.role,
     teacherId: record.teacherProfile?.id ?? null,
@@ -87,7 +88,7 @@ export async function authenticateWithPassword(
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
-      school: { select: { name: true, isActive: true } },
+      school: { select: { name: true, workspaceType: true, isActive: true } },
       teacherProfile: { select: { id: true, employeeCode: true, isActive: true, _count: { select: { teachingAssignments: true } } } },
     },
   });
@@ -158,7 +159,7 @@ export async function resolveServerSession(
     include: {
       user: {
         include: {
-          school: { select: { name: true, isActive: true } },
+          school: { select: { name: true, workspaceType: true, isActive: true } },
           teacherProfile: { select: { id: true, employeeCode: true, isActive: true, _count: { select: { teachingAssignments: true } } } },
         },
       },

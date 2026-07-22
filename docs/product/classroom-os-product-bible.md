@@ -67,6 +67,7 @@ Classroom OS is not a generic school ERP. Its center of gravity is the teacher's
 | **School Administration Web** | `SCHOOL_OWNER`, `ADMIN` | School dashboard, students, staff, classrooms, subjects, academic years/terms, schedules, teaching assignments, imports, settings, documents, school-wide reports | A client-controlled identity switch; unscoped cross-tenant data; mobile-first in-class interaction as the primary workflow |
 | **Teacher Web Workspace** | `TEACHER` | Personal dashboard, assigned classes, detailed timetable, class history, detailed gradebook, detailed reports, lesson resources, documents, profile | Staff management, school settings, school-level imports, teacher selector, unassigned classes, implicit school-wide metrics |
 | **Teacher Mobile App** | `TEACHER` | Today, next class, Live Class, attendance, rapid score entry, class actions, profile, resilient retry states | School administration, dense desktop tables, teacher selector, unrestricted file administration, complex setup workflows |
+| **Personal Teacher Workspace** | Personal `SCHOOL_OWNER` with linked teacher profile | Own students, classrooms, subjects, teaching assignments, timetable, Live Class, attendance, scores, profile | Staff administration, school-wide imports, other tenants, unassigned teaching contexts |
 | **Future Student App** | Future `STUDENT` | **Planned:** own timetable, assignments, results, teacher-published resources and notices | Staff tools, other students' records, teacher workflow controls, school configuration |
 | **Future Parent App** | Future `PARENT` | **Planned:** authorized child summaries, attendance notices, published results and communications | Direct grading, classroom operations, unrelated children, staff or school configuration |
 
@@ -126,7 +127,7 @@ School Administration contains:
 - documents;
 - settings where role permits.
 
-The separation is mandatory:
+The separation is mandatory. A `PERSONAL` workspace is a tenant-isolated exception in which one account owns the workspace and has a linked Teacher Profile; Mobile still exposes teacher operations only:
 
 - Teacher identity comes from the authenticated context.
 - Teachers never select or inspect another teacher through a teacher filter.
@@ -747,6 +748,7 @@ The repository has not yet reached this MVP definition because Teacher Mobile, p
 8. Imports are template-based, previewed, validated, and administration-only.
 9. Charts and aggregates are role- and context-scoped.
 10. Biometric features are deferred and prohibited without explicit governance approval.
+11. Self-registration may create either a multi-user `SCHOOL` workspace or a single-owner `PERSONAL` teacher workspace; both retain the same tenant and teaching-context isolation.
 
 Intentional changes to these decisions require updating this document in the same coherent change.
 

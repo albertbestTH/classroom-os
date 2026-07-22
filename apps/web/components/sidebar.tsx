@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { logoutAction } from "@/app/login/actions";
-import { navigationForRole } from "@/lib/navigation";
+import { navigationForUser } from "@/lib/navigation";
 
 const roleLabels: Record<CurrentUserResult["role"], string> = {
   SCHOOL_OWNER: "เจ้าของโรงเรียน",
@@ -42,7 +42,7 @@ function AccountSummary({ user }: { user: CurrentUserResult }) {
 
 export function Sidebar({ currentUser }: { currentUser: CurrentUserResult }) {
   const pathname = usePathname();
-  const navigationItems = navigationForRole(currentUser.role);
+  const navigationItems = navigationForUser(currentUser);
 
   return (
     <>

@@ -199,3 +199,5 @@ Vitest integration tests run against the disposable local PostgreSQL database. T
 This foundation has no biometric or face-recognition tables, no real student data, and no parent/student application models. Social login, password reset, MFA, and production identity-provider configuration remain out of scope.
 
 Profile and onboarding additions include nullable contact fields on `User`/`School`, `EmailChangeRequest`, and `PendingSchoolRegistration`. Pending rows are pre-tenant and may create only a new school plus its first owner after a one-time verification token is consumed. Email-change rows are tenant- and user-bound; confirmation changes the email, revokes sessions, and writes a sanitized audit record atomically.
+
+`School.workspaceType` distinguishes multi-user `SCHOOL` tenants from `PERSONAL` teacher tenants. Personal confirmation creates the owner and a one-to-one `Teacher` profile atomically. Classroom, enrollment, assignment, timetable, session, attendance, assessment, and score records continue to use the same `schoolId` boundaries; no personal data is stored outside a tenant.

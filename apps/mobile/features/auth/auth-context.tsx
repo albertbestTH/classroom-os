@@ -19,6 +19,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function canUseTeacherMobile(user: CurrentUserResult): boolean {
+  return user.role === "TEACHER" || (user.workspaceType === "PERSONAL" && user.role === "SCHOOL_OWNER" && Boolean(user.teacherId));
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<AuthState>("loading");
@@ -37,7 +41,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
       try {
         const current = await apiRequest<CurrentUserResult>("/api/mobile/auth/session", { token: stored.token });
-        if (current.role !== "TEACHER") throw new Error("Unsupported mobile role");
+        if (!canUseTeacherMobile(current)) throw new Error("Unsupported mobile role");
         if (active) { setToken(stored.token); setUser(current); setState("authenticated"); }
       } catch {
         await deleteMobileSession(); await clearPersistedQueries(); queryClient.clear();
@@ -53,7 +57,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     async login(email, password) {
       await clearPersistedQueries(); queryClient.clear();
       const session = await apiRequest<MobileSessionResult>("/api/mobile/auth/login", { method: "POST", body: { email, password }, retryReads: 0 });
-      if (session.user.role !== "TEACHER") throw new Error("Unsupported mobile role");
+      if (!canUseTeacherMobile(session.user)) throw new Error("Unsupported mobile role");
       await saveMobileSession({ token: session.token, expiresAt: session.expiresAt });
       setToken(session.token); setUser(session.user); setMessage(null); setState("authenticated");
     },
