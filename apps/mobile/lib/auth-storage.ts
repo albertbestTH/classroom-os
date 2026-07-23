@@ -1,8 +1,9 @@
+import type { CurrentUserResult } from "@classroom-os/types";
 import * as SecureStore from "expo-secure-store";
 
 const SESSION_KEY = "classroom-os.mobile-session";
 
-export type StoredMobileSession = { token: string; expiresAt: string };
+export type StoredMobileSession = { token: string; expiresAt: string; user?: CurrentUserResult };
 
 export async function saveMobileSession(session: StoredMobileSession): Promise<void> {
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session), {
@@ -16,7 +17,7 @@ export async function readMobileSession(): Promise<StoredMobileSession | null> {
   try {
     const value = JSON.parse(stored) as Partial<StoredMobileSession>;
     if (typeof value.token !== "string" || typeof value.expiresAt !== "string") return null;
-    return { token: value.token, expiresAt: value.expiresAt };
+    return { token: value.token, expiresAt: value.expiresAt, user: value.user };
   } catch { return null; }
 }
 

@@ -11,6 +11,7 @@ import {
   ErrorState,
   LoadingSkeleton,
   MetricCard,
+  OfflineBanner,
   ProgressBar,
   SafeScreen,
   SectionHeader,
@@ -19,12 +20,14 @@ import {
 import { colors, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
 
 export function TodayScreen() {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
+  const { isOnline } = useNetworkStatus();
   const today = useAuthenticatedQuery<TodayTimetableResult>(["today"], "/api/me/today");
   const start = useMutation({
     mutationFn: async (item: TodayClassResult) => {
@@ -52,6 +55,7 @@ export function TodayScreen() {
   const date = new Intl.DateTimeFormat("th-TH", { dateStyle: "full" }).format(new Date(`${data.localDate}T12:00:00`));
 
   return <SafeScreen refreshControl={<RefreshControl refreshing={today.isRefetching} onRefresh={() => void today.refetch()} tintColor={colors.primary} />}>
+    <OfflineBanner visible={!isOnline} lastUpdated={today.dataUpdatedAt} />
     <AppHeader title={`สวัสดีครับ ครู${user?.firstName ?? ""}`} subtitle={`${user?.schoolName ?? ""} · ${date}`} />
 
     {live ? <><SectionHeader title="คาบที่กำลังสอน" /><SessionCard item={live} primary /></> : next ? <><SectionHeader title="คาบถัดไป" /><SessionCard item={next} primary onStart={(item) => start.mutate(item)} /></> : null}
@@ -61,6 +65,7 @@ export function TodayScreen() {
     <View style={styles.metrics}>
       <MetricCard label="คาบทั้งหมด" value={data.classes.length} />
       <MetricCard label="เสร็จแล้ว" value={data.completedCount} />
+      <MetricCard label="คาบที่เหลือ" value={Math.max(0, data.classes.length - data.completedCount - data.cancelledCount)} />
       <MetricCard label="เช็กชื่อครบ" value={attendanceComplete} />
       <MetricCard label="ยกเลิก/พลาด" value={data.cancelledCount + data.missedCount} />
     </View>

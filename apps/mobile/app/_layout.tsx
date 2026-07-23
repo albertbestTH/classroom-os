@@ -5,9 +5,15 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider } from "@/features/auth/auth-context";
+import { ThemeProvider, useTheme } from "@/features/theme/theme-context";
 import { queryClient } from "@/lib/query-client";
 import { persistedQueryOptions } from "@/lib/query-persistence";
 
+function ThemedApp() {
+  const { isDark } = useTheme();
+  return <AuthProvider><StatusBar style={isDark ? "light" : "dark"} /><Stack screenOptions={{ headerShown: false }} /></AuthProvider>;
+}
+
 export default function RootLayout() {
-  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><PersistQueryClientProvider client={queryClient} persistOptions={persistedQueryOptions}><AuthProvider><StatusBar style="dark" /><Stack screenOptions={{ headerShown: false }} /></AuthProvider></PersistQueryClientProvider></SafeAreaProvider></GestureHandlerRootView>;
+  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><ThemeProvider><PersistQueryClientProvider client={queryClient} persistOptions={persistedQueryOptions}><ThemedApp /></PersistQueryClientProvider></ThemeProvider></SafeAreaProvider></GestureHandlerRootView>;
 }

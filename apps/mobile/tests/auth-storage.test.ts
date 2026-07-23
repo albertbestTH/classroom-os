@@ -12,7 +12,7 @@ jest.mock("expo-secure-store", () => ({
 describe("secure mobile session storage", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("stores only the opaque token and expiry using device-only accessibility", async () => {
+  it("stores the offline session using device-only accessibility", async () => {
     await saveMobileSession({ token: "synthetic-token", expiresAt: "2030-01-01T00:00:00.000Z" });
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       "classroom-os.mobile-session",

@@ -1,12 +1,15 @@
 import type { CurrentUserResult, TodayTimetableResult } from "@classroom-os/types";
 import Constants from "expo-constants";
+import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
-import { AppButton, AppHeader, Card, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { AppButton, AppHeader, Avatar, Card, Chip, ListTile, OfflineBanner, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { colors, radius, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { useTheme, type ThemePreference } from "@/features/theme/theme-context";
 import { developmentEnvironmentLabel } from "@/lib/environment";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
@@ -17,6 +20,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 export default function ProfileScreen() {
   const { user, token, updateUser, logout } = useAuth();
+  const { isOnline } = useNetworkStatus();
+  const { preference, setPreference } = useTheme();
   const [firstName, setFirstName] = useState(user?.firstName ?? "");
   const [lastName, setLastName] = useState(user?.lastName ?? "");
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ?? "");
@@ -24,7 +29,6 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const today = useAuthenticatedQuery<TodayTimetableResult>(["today"], "/api/me/today");
   const environment = developmentEnvironmentLabel();
-  const initials = `${user?.firstName?.charAt(0) ?? ""}${user?.lastName?.charAt(0) ?? ""}` || "ครู";
 
   async function saveProfile() {
     setSaving(true); setProfileMessage("");
@@ -36,10 +40,11 @@ export default function ProfileScreen() {
   }
 
   return <SafeScreen>
+    <OfflineBanner visible={!isOnline} lastUpdated={today.dataUpdatedAt} />
     <AppHeader title="โปรไฟล์" subtitle="ข้อมูลบัญชีครูที่กำลังใช้งาน" />
     <Card>
       <View style={styles.identity}>
-        <View accessibilityLabel="รูปโปรไฟล์ครูแบบอักษรย่อ" style={styles.avatar}><Text style={styles.initials}>{initials}</Text></View>
+        <Avatar label={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`} size={56} />
         <View style={styles.identityText}><Text style={styles.name}>{user?.firstName} {user?.lastName}</Text><Text style={styles.email}>{user?.email ?? "-"}</Text></View>
         <StatusBadge label="ครูผู้สอน" tone="success" />
       </View>
@@ -64,7 +69,10 @@ export default function ProfileScreen() {
     <Card>
       <Detail label="เวอร์ชัน" value={Constants.expoConfig?.version ?? "0.1.0"} />
       {environment ? <Detail label="API สำหรับพัฒนา" value={environment} /> : null}
+      <ListTile title="โอเพนซอร์สไลเซนส์" subtitle="แพ็กเกจที่ใช้ใน Classroom OS" onPress={() => router.push("/licenses" as never)} />
     </Card>
+    <SectionHeader title="ธีม" />
+    <View accessibilityRole="radiogroup" style={styles.themeOptions}>{([['system', 'ตามระบบ'], ['light', 'สว่าง'], ['dark', 'มืด']] as const).map(([value, label]) => <Chip key={value} label={label} selected={preference === value} onPress={() => void setPreference(value as ThemePreference)} />)}</View>
     <AppButton label="ออกจากระบบ" tone="danger" onPress={() => void logout()} />
   </SafeScreen>;
 }
@@ -72,8 +80,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   identity: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   identityText: { flex: 1 },
-  avatar: { width: 56, height: 56, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
-  initials: { color: colors.primaryDark, fontSize: 19, fontWeight: "900" },
   name: { color: colors.text, fontSize: 18, fontWeight: "800" },
   email: { color: colors.muted, fontSize: 13, marginTop: 3 },
   detail: { gap: 3 },
@@ -83,4 +89,5 @@ const styles = StyleSheet.create({
   notice: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.text },
   feedback: { color: colors.primaryDark, fontSize: 14, fontWeight: "700" },
+  themeOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

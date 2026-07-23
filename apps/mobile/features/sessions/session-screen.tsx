@@ -4,12 +4,13 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 
-import { AppButton, AppHeader, Card, ConfirmationModal, ErrorState, LoadingSkeleton, SafeScreen, StatusBadge } from "@/components/ui/primitives";
+import { AppButton, AppHeader, Card, ConfirmationModal, ErrorState, LoadingSkeleton, OfflineBanner, ProgressBar, SafeScreen, StatusBadge, Timeline, TimelineItem } from "@/components/ui/primitives";
 import { colors, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 
 function elapsed(startedAt: string | null, now: number) {
   if (!startedAt) return "00:00";
@@ -20,6 +21,7 @@ function elapsed(startedAt: string | null, now: number) {
 export function SessionScreen({ id }: { id: string }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const { isOnline } = useNetworkStatus();
   const [confirm, setConfirm] = useState(false);
   const [now, setNow] = useState(0);
   const session = useAuthenticatedQuery<ClassSessionResult>(["session", id], `/api/sessions/${id}`);
@@ -47,6 +49,7 @@ export function SessionScreen({ id }: { id: string }) {
   const data = session.data;
   const incomplete = data.attendanceRecordedCount < data.enrolledStudentCount;
   return <SafeScreen>
+    <OfflineBanner visible={!isOnline} lastUpdated={session.dataUpdatedAt} />
     <AppButton label="← กลับไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} />
     <AppHeader title={data.classroomName} subtitle={`${data.subjectName} · ${data.termName}`} />
     <View style={styles.row}>
@@ -56,14 +59,15 @@ export function SessionScreen({ id }: { id: string }) {
     <Card>
       <Text style={styles.heading}>การเช็กชื่อ</Text>
       <Text style={styles.muted}>บันทึกแล้ว {data.attendanceRecordedCount}/{data.enrolledStudentCount} คน</Text>
+      <ProgressBar label="ความคืบหน้าการเช็กชื่อ" value={data.attendanceRecordedCount} max={data.enrolledStudentCount} tone={incomplete ? "warning" : "success"} />
       {data.status === "live" ? <AppButton label="เช็กชื่อ" onPress={() => router.push(`/sessions/${id}/attendance?classroomId=${data.classroomId}`)} /> : null}
       {data.status === "live" ? <AppButton label="คะแนนด่วน" tone="secondary" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${data.teachingAssignmentId}&classroomId=${data.classroomId}`)} /> : null}
     </Card>
     <Card>
       <Text style={styles.heading}>ไทม์ไลน์คาบเรียน</Text>
-      {timeline.data?.length ? timeline.data.map((event) => <Text key={event.id} style={styles.muted}>• {event.eventType} · {new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(new Date(event.createdAt))}</Text>) : <Text style={styles.muted}>ยังไม่มีกิจกรรมเพิ่มเติม</Text>}
+      {timeline.data?.length ? <Timeline>{timeline.data.map((event) => <TimelineItem key={event.id} title={event.eventType} description={new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(new Date(event.createdAt))} status="complete" />)}</Timeline> : <Text style={styles.muted}>ยังไม่มีกิจกรรมเพิ่มเติม</Text>}
     </Card>
-    {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" onPress={() => setConfirm(true)} /> : null}
+    {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" disabled={!isOnline} accessibilityHint={!isOnline ? "ต้องเชื่อมต่ออินเทอร์เน็ตก่อนจบคาบ" : undefined} onPress={() => setConfirm(true)} /> : null}
     {end.error ? <Text accessibilityRole="alert" style={styles.error}>{thaiErrorMessage(end.error)} กรุณาโหลดสถานะใหม่</Text> : null}
     <ConfirmationModal visible={confirm} title="ยืนยันจบคาบ" description={`${data.classroomName} · ${data.subjectName}${incomplete ? "\nยังเช็กชื่อไม่ครบ กรุณาตรวจสอบก่อนยืนยัน" : ""}`} confirmLabel={end.isPending ? "กำลังจบคาบ…" : "ยืนยันจบคาบ"} destructive onConfirm={() => { if (!end.isPending) end.mutate(); }} onCancel={() => setConfirm(false)} />
   </SafeScreen>;

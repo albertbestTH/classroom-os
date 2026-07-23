@@ -4,11 +4,13 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { AppButton, AppHeader, Card, EmptyState, ErrorState, LoadingSkeleton, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
+import { AppButton, AppHeader, Card, EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, SafeScreen, SearchBar, SectionHeader, StatusBadge } from "@/components/ui/primitives";
 import { colors, spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { apiRequest } from "@/lib/api-client";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 import { thaiErrorMessage } from "@/lib/api-error";
+import { matchesSearch } from "@/lib/search";
 import { formatTimetableTime } from "@/lib/time";
 
 const weekdays = [
@@ -23,6 +25,8 @@ export function ClassesScreen() {
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const [view, setView] = useState<"day" | "week">("day");
+  const [search, setSearch] = useState("");
+  const { isOnline } = useNetworkStatus();
   const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
   const [assignments, timetable, classrooms, today, coverages] = useQueries({ queries: [
     { queryKey: ["assignments"], queryFn: () => apiRequest<TeachingAssignmentResult[]>("/api/teaching-assignments", { token }) },
@@ -62,6 +66,7 @@ export function ClassesScreen() {
     ...(today.data?.classes.map((item) => item.timetableEntry) ?? []),
   ].map((entry) => [entry.id, entry])).values()]
     .filter((entry) => entry.isActive && entry.weekday >= 1 && entry.weekday <= 5)
+    .filter((entry) => matchesSearch(search, [entry.classroomName, entry.subjectName, entry.room]))
     .sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime));
   const todayWeekday = new Date(`${today.data!.localDate}T12:00:00Z`).getUTCDay();
   const activeWeekday = selectedWeekday ?? (todayWeekday >= 1 && todayWeekday <= 5 ? todayWeekday : 1);
@@ -71,7 +76,9 @@ export function ClassesScreen() {
   const incomingCoverages = coverages.data?.filter((item) => item.status === "pending" && item.substituteTeacherId === user?.teacherId) ?? [];
 
   return <SafeScreen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
+    <OfflineBanner visible={!isOnline} lastUpdated={Math.min(...[assignments.dataUpdatedAt, timetable.dataUpdatedAt, classrooms.dataUpdatedAt, today.dataUpdatedAt].filter(Boolean))} />
     <AppHeader title="ตารางสอน" subtitle="คาบเรียน ห้องเรียน และ Live Class อยู่ในที่เดียว" />
+    <SearchBar accessibilityLabel="ค้นหาชั้นเรียน" placeholder="ค้นหาห้อง วิชา หรือห้องสอน" value={search} onChangeText={setSearch} />
     {incomingCoverages.length ? <View style={styles.day}><SectionHeader title="คำขอสอนแทน" action={<StatusBadge label={`${incomingCoverages.length} รายการ`} tone="live" />} />{incomingCoverages.map((item) => <Card key={item.id}><Text style={styles.classroom}>{item.kind === "swap" ? "คำขอสลับคาบ" : "คำขอฝากสอน"}</Text><Text style={styles.subject}>{item.localDate} · จาก {item.originalTeacherName}</Text>{item.reason ? <Text style={styles.meta}>{item.reason}</Text> : null}<AppButton label="ยอมรับ" onPress={() => resolveCoverage.mutate({ id: item.id, status: "active" })} disabled={resolveCoverage.isPending} /><AppButton label="ปฏิเสธ" tone="secondary" onPress={() => resolveCoverage.mutate({ id: item.id, status: "declined" })} disabled={resolveCoverage.isPending} /></Card>)}</View> : null}
     <View accessibilityRole="tablist" style={styles.viewSwitch}>
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === "day" }} onPress={() => setView("day")} style={[styles.viewOption, view === "day" && styles.viewOptionActive]}><Text style={[styles.viewText, view === "day" && styles.viewTextActive]}>รายวัน</Text></Pressable>

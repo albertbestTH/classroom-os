@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 
 import { apiRequest } from "@/lib/api-client";
+import { MobileApiError } from "@/lib/api-error";
 import { deleteMobileSession, readMobileSession, saveMobileSession } from "@/lib/auth-storage";
 import { clearPersistedQueries } from "@/lib/query-persistence";
 
@@ -43,7 +44,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const current = await apiRequest<CurrentUserResult>("/api/mobile/auth/session", { token: stored.token });
         if (!canUseTeacherMobile(current)) throw new Error("Unsupported mobile role");
         if (active) { setToken(stored.token); setUser(current); setState("authenticated"); }
-      } catch {
+      } catch (error) {
+        if (stored.user && error instanceof MobileApiError && (error.kind === "network" || error.kind === "timeout")) {
+          if (active) { setToken(stored.token); setUser(stored.user); setMessage("กำลังใช้งานแบบออฟไลน์"); setState("authenticated"); }
+          return;
+        }
         await deleteMobileSession(); await clearPersistedQueries(); queryClient.clear();
         if (active) { setMessage("เซสชันไม่พร้อมใช้งาน กรุณาเข้าสู่ระบบอีกครั้ง"); setState("unauthenticated"); }
       }
@@ -58,7 +63,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       await clearPersistedQueries(); queryClient.clear();
       const session = await apiRequest<MobileSessionResult>("/api/mobile/auth/login", { method: "POST", body: { email, password }, retryReads: 0 });
       if (!canUseTeacherMobile(session.user)) throw new Error("Unsupported mobile role");
-      await saveMobileSession({ token: session.token, expiresAt: session.expiresAt });
+      await saveMobileSession({ token: session.token, expiresAt: session.expiresAt, user: session.user });
       setToken(session.token); setUser(session.user); setMessage(null); setState("authenticated");
     },
     async logout() {
