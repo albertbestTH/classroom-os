@@ -2,21 +2,16 @@ import type { ClassSessionResult, SessionTimelineEventResult } from "@classroom-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 
-import { AppButton, AppHeader, Card, ConfirmationModal, ErrorState, LoadingSkeleton, OfflineBanner, ProgressBar, SafeScreen, StatusBadge, Timeline, TimelineItem } from "@/components/ui/primitives";
-import { colors, spacing } from "@/constants/tokens";
+import { AppButton, AppHeader, Card, ConfirmationModal, ErrorState, LoadingSkeleton, OfflineBanner, ProgressBar, SafeScreen, StatusBadge, ThemedText, Timeline, TimelineItem } from "@/components/ui/primitives";
+import { spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
 import { useNetworkStatus } from "@/hooks/use-network-status";
-
-function elapsed(startedAt: string | null, now: number) {
-  if (!startedAt) return "00:00";
-  const seconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
-  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-}
+import { formatElapsed, formatRemaining } from "./session-time";
 
 export function SessionScreen({ id }: { id: string }) {
   const { token } = useAuth();
@@ -44,7 +39,7 @@ export function SessionScreen({ id }: { id: string }) {
   });
 
   if (session.isLoading) return <LoadingSkeleton />;
-  if (session.error || !session.data) return <SafeScreen><AppButton label="← กลับไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} /><ErrorState message={thaiErrorMessage(session.error)} onRetry={() => void session.refetch()} /></SafeScreen>;
+  if (session.error || !session.data) return <SafeScreen><AppButton label="← กลับไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} /><ErrorState error={session.error} onRetry={() => void session.refetch()} /></SafeScreen>;
 
   const data = session.data;
   const incomplete = data.attendanceRecordedCount < data.enrolledStudentCount;
@@ -54,29 +49,30 @@ export function SessionScreen({ id }: { id: string }) {
     <AppHeader title={data.classroomName} subtitle={`${data.subjectName} · ${data.termName}`} />
     <View style={styles.row}>
       <StatusBadge label={data.status === "live" ? "LIVE · กำลังสอน" : data.status.toUpperCase()} tone={data.status === "live" ? "live" : data.status === "completed" ? "success" : data.status === "cancelled" ? "danger" : "neutral"} />
-      {data.status === "live" ? <Text accessibilityLabel={`เวลาที่สอน ${elapsed(data.startedAt, now)}`} style={styles.timer}>{elapsed(data.startedAt, now)}</Text> : null}
+      {data.status === "live" ? <View style={styles.timers}><ThemedText accessibilityLabel={`เวลาที่สอน ${formatElapsed(data.startedAt, now)}`} tone="primary" style={styles.timer}>{formatElapsed(data.startedAt, now)}</ThemedText><ThemedText tone="muted" style={styles.remaining}>เหลือตามตาราง {formatRemaining(data.scheduledEnd, now)}</ThemedText></View> : null}
     </View>
     <Card>
-      <Text style={styles.heading}>การเช็กชื่อ</Text>
-      <Text style={styles.muted}>บันทึกแล้ว {data.attendanceRecordedCount}/{data.enrolledStudentCount} คน</Text>
+      <ThemedText style={styles.heading}>การเช็กชื่อ</ThemedText>
+      <ThemedText tone="muted" style={styles.muted}>บันทึกแล้ว {data.attendanceRecordedCount}/{data.enrolledStudentCount} คน</ThemedText>
       <ProgressBar label="ความคืบหน้าการเช็กชื่อ" value={data.attendanceRecordedCount} max={data.enrolledStudentCount} tone={incomplete ? "warning" : "success"} />
       {data.status === "live" ? <AppButton label="เช็กชื่อ" onPress={() => router.push(`/sessions/${id}/attendance?classroomId=${data.classroomId}`)} /> : null}
       {data.status === "live" ? <AppButton label="คะแนนด่วน" tone="secondary" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${data.teachingAssignmentId}&classroomId=${data.classroomId}`)} /> : null}
     </Card>
     <Card>
-      <Text style={styles.heading}>ไทม์ไลน์คาบเรียน</Text>
-      {timeline.data?.length ? <Timeline>{timeline.data.map((event) => <TimelineItem key={event.id} title={event.eventType} description={new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(new Date(event.createdAt))} status="complete" />)}</Timeline> : <Text style={styles.muted}>ยังไม่มีกิจกรรมเพิ่มเติม</Text>}
+      <ThemedText style={styles.heading}>ไทม์ไลน์คาบเรียน</ThemedText>
+      {timeline.data?.length ? <Timeline>{timeline.data.map((event) => <TimelineItem key={event.id} title={event.eventType} description={new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(new Date(event.createdAt))} status="complete" />)}</Timeline> : <ThemedText tone="muted" style={styles.muted}>ยังไม่มีกิจกรรมเพิ่มเติม</ThemedText>}
     </Card>
     {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" disabled={!isOnline} accessibilityHint={!isOnline ? "ต้องเชื่อมต่ออินเทอร์เน็ตก่อนจบคาบ" : undefined} onPress={() => setConfirm(true)} /> : null}
-    {end.error ? <Text accessibilityRole="alert" style={styles.error}>{thaiErrorMessage(end.error)} กรุณาโหลดสถานะใหม่</Text> : null}
+    {end.error ? <ThemedText accessibilityRole="alert" tone="danger">{thaiErrorMessage(end.error)} กรุณาโหลดสถานะใหม่</ThemedText> : null}
     <ConfirmationModal visible={confirm} title="ยืนยันจบคาบ" description={`${data.classroomName} · ${data.subjectName}${incomplete ? "\nยังเช็กชื่อไม่ครบ กรุณาตรวจสอบก่อนยืนยัน" : ""}`} confirmLabel={end.isPending ? "กำลังจบคาบ…" : "ยืนยันจบคาบ"} destructive onConfirm={() => { if (!end.isPending) end.mutate(); }} onCancel={() => setConfirm(false)} />
   </SafeScreen>;
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
-  timer: { color: colors.primaryDark, fontSize: 24, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  heading: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  muted: { color: colors.muted, lineHeight: 22 },
-  error: { color: colors.danger },
+  timers: { alignItems: "flex-end", gap: 2 },
+  timer: { fontSize: 24, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  remaining: { fontSize: 13, fontVariant: ["tabular-nums"] },
+  heading: { fontSize: 18, fontWeight: "700" },
+  muted: { lineHeight: 22 },
 });

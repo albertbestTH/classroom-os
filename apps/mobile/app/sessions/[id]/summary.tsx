@@ -3,11 +3,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton, AppHeader, Card, ErrorState, LoadingSkeleton, MetricCard, ProgressBar, SafeScreen, SectionHeader, StatusBadge } from "@/components/ui/primitives";
-import { colors, spacing } from "@/constants/tokens";
+import { spacing } from "@/constants/tokens";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
+import { useTheme } from "@/features/theme/theme-context";
 import { thaiErrorMessage } from "@/lib/api-error";
 
 export default function SummaryScreen() {
+  const { colors: themeColors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const session = useAuthenticatedQuery<ClassSessionResult>(["session", id], `/api/sessions/${id}`);
   const attendance = useAuthenticatedQuery<SessionAttendanceResult>(
@@ -33,9 +35,9 @@ export default function SummaryScreen() {
     {session.data.cancellationReason ? <Card><Text>{session.data.cancellationReason}</Text></Card> : null}
 
     <Card>
-      <Text style={styles.heroLabel}>อัตราเข้าเรียน</Text>
-      <Text accessibilityLabel={`อัตราเข้าเรียน ${attendanceRate} เปอร์เซ็นต์`} style={styles.heroValue}>{attendanceRate}%</Text>
-      <Text style={styles.heroCaption}>มาเรียนและมาสาย {attending} จาก {enrolled} คน</Text>
+      <Text style={[styles.heroLabel, { color: themeColors.muted }]}>อัตราเข้าเรียน</Text>
+      <Text accessibilityLabel={`อัตราเข้าเรียน ${attendanceRate} เปอร์เซ็นต์`} style={[styles.heroValue, { color: themeColors.primaryDark }]}>{attendanceRate}%</Text>
+      <Text style={[styles.heroCaption, { color: themeColors.text }]}>มาเรียนและมาสาย {attending} จาก {enrolled} คน</Text>
       <ProgressBar label="บันทึกการเช็กชื่อ" value={recorded} max={enrolled} tone={recorded >= enrolled ? "success" : "warning"} />
     </Card>
 
@@ -48,7 +50,7 @@ export default function SummaryScreen() {
     </View>
     <Card>
       <ProgressBar label="มาเรียนและมาสาย" value={attending} max={enrolled} tone="success" />
-      {needsFollowUp > 0 ? <Text style={styles.followUp}>ควรติดตามนักเรียนที่ขาดหรือลา {needsFollowUp} คน</Text> : <Text style={styles.complete}>นักเรียนทุกคนมาเรียนหรือมาสาย</Text>}
+      {needsFollowUp > 0 ? <Text style={[styles.followUp, { color: themeColors.warning }]}>ควรติดตามนักเรียนที่ขาดหรือลา {needsFollowUp} คน</Text> : <Text style={[styles.complete, { color: themeColors.success }]}>นักเรียนทุกคนมาเรียนหรือมาสาย</Text>}
     </Card>
 
     <AppButton label="กลับไปหน้าวันนี้" onPress={() => router.replace("/(tabs)")} />
@@ -57,10 +59,7 @@ export default function SummaryScreen() {
 }
 
 const styles = StyleSheet.create({
-  heroLabel: { color: colors.muted, fontSize: 16, fontWeight: "700" },
-  heroValue: { color: colors.primaryDark, fontSize: 48, fontWeight: "900", lineHeight: 56 },
-  heroCaption: { color: colors.text, fontSize: 16, lineHeight: 24 },
+  heroLabel: { fontSize: 16, fontWeight: "700" }, heroValue: { fontSize: 48, fontWeight: "900", lineHeight: 56 }, heroCaption: { fontSize: 16, lineHeight: 24 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  followUp: { color: colors.warning, fontSize: 15, fontWeight: "700", lineHeight: 22 },
-  complete: { color: colors.success, fontSize: 15, fontWeight: "700", lineHeight: 22 },
+  followUp: { fontSize: 15, fontWeight: "700", lineHeight: 22 }, complete: { fontSize: 15, fontWeight: "700", lineHeight: 22 },
 });

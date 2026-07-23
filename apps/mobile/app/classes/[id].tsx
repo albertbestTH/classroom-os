@@ -1,8 +1,7 @@
 import type { TeachingAssignmentResult, TimetableEntryResult } from "@classroom-os/types";
 import { router, useLocalSearchParams } from "expo-router";
-import { Text } from "react-native";
 
-import { AppButton, AppHeader, Card, ErrorState, LoadingSkeleton, SafeScreen } from "@/components/ui/primitives";
+import { AppButton, AppHeader, Card, ErrorState, ListTile, LoadingSkeleton, SafeScreen, ThemedText } from "@/components/ui/primitives";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { formatTimetableTime } from "@/lib/time";
 import { thaiErrorMessage } from "@/lib/api-error";
@@ -22,9 +21,9 @@ export default function ClassDetailScreen() {
     <AppButton label="← กลับไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} />
     <AppHeader title={assignment.classroomName} subtitle={`${assignment.subjectName} · ${assignment.termName}`} />
     <Card>
-      <Text>ปีการศึกษา {assignment.academicYearName}</Text>
-      <Text>ตารางประจำสัปดาห์ {slots.length} คาบ</Text>
-      {slots.map((slot) => <Text key={slot.id}>{weekday[slot.weekday]} · {formatTimetableTime(slot.startTime)}–{formatTimetableTime(slot.endTime)} น.{slot.room ? ` · ห้อง ${slot.room}` : ""}</Text>)}
+      <ThemedText>ปีการศึกษา {assignment.academicYearName}</ThemedText>
+      <ThemedText tone="muted">ตารางประจำสัปดาห์ {slots.length} คาบ</ThemedText>
+      {slots.map((slot) => <ListTile key={slot.id} title={`${weekday[slot.weekday]} · ${formatTimetableTime(slot.startTime)}–${formatTimetableTime(slot.endTime)} น.`} subtitle={slot.room ? `ห้อง ${slot.room}` : "ไม่ระบุห้อง"} />)}
     </Card>
   </SafeScreen>;
 }

@@ -7,3 +7,5 @@ Successful Today, timetable, teaching assignment, classroom, coverage, and profi
 The opaque session token and minimal current-user snapshot use device-only secure storage. A valid, unexpired session may open cached teacher views during a network outage. An authorization failure clears session and cache; a network or timeout failure does not.
 
 Attendance saves, session lifecycle actions, profile updates, and all other mutations require connectivity. The app never queues or invents server actions. Student rosters and attendance drafts are excluded from persisted query storage to reduce sensitive local data and avoid write conflicts.
+
+The profile query, teaching assignments, classroom list, timetable, coverage requests, and Today response carry independent freshness timestamps. Screens show the oldest relevant timestamp so teachers are not given a misleading impression that a composite view is newer than one of its sources.
