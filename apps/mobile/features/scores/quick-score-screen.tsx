@@ -2,7 +2,7 @@ import type { AssessmentResult, GradebookResult } from "@classroom-os/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { StudentAvatar } from "@/components/student/student-avatar";
 import { AppButton, AppHeader, Card, EmptyState, ErrorState, LoadingSkeleton, SafeScreen } from "@/components/ui/primitives";
@@ -13,6 +13,10 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useTheme } from "@/features/theme/theme-context";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
+import { invalidateScoreWorkflow, queryKeys } from "@/lib/query-keys";
+
+import { parseScoreInput } from "./score-input";
+import { ScoreInputField } from "./score-input-field";
 
 type Props = { sessionId: string; teachingAssignmentId: string; classroomId: string };
 
@@ -22,7 +26,7 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
   const { isOnline } = useNetworkStatus();
   const { colors: themeColors } = useTheme();
   const gradebook = useAuthenticatedQuery<GradebookResult>(
-    ["gradebook", teachingAssignmentId],
+    queryKeys.gradebook(teachingAssignmentId),
     `/api/assessments?teachingAssignmentId=${encodeURIComponent(teachingAssignmentId)}&classSessionId=${encodeURIComponent(sessionId)}`,
     Boolean(teachingAssignmentId),
   );
@@ -46,21 +50,24 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
       maxScore: 10,
       dueAt: null,
     } }),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["gradebook", teachingAssignmentId] }),
+    onSuccess: async () => invalidateScoreWorkflow(queryClient, teachingAssignmentId, sessionId),
   });
   const save = useMutation({
     mutationFn: () => apiRequest(`/api/assessments/${assessment!.id}/scores`, { method: "PUT", token, body: {
       classroomId,
       scores: gradebook.data!.students.flatMap((student) => {
-        const raw = scoreValue(student.studentId).trim();
-        return raw === "" ? [] : [{ studentId: student.studentId, value: Number(raw) }];
+        const parsed = parseScoreInput(scoreValue(student.studentId), assessment!.maxScore);
+        if (parsed.kind === "invalid") throw new Error(parsed.message);
+        return parsed.kind === "empty" ? [] : [{ studentId: student.studentId, value: parsed.value }];
       }),
     } }),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["gradebook", teachingAssignmentId] }),
+    onSuccess: async () => invalidateScoreWorkflow(queryClient, teachingAssignmentId, sessionId),
   });
 
   if (gradebook.isLoading) return <LoadingSkeleton />;
   if (gradebook.error || !gradebook.data) return <SafeScreen><AppButton label="← กลับไปหน้าห้องเรียน" tone="secondary" onPress={() => router.back()} /><ErrorState message={thaiErrorMessage(gradebook.error)} onRetry={() => void gradebook.refetch()} /></SafeScreen>;
+
+  const hasInvalidScore = assessment ? gradebook.data.students.some((student) => parseScoreInput(scoreValue(student.studentId), assessment.maxScore).kind === "invalid") : false;
 
   return <SafeScreen>
     <AppButton label="← กลับไปหน้าห้องเรียน" tone="secondary" onPress={() => router.back()} />
@@ -68,13 +75,14 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
     {!assessment ? <EmptyState title="ยังไม่มีงานคะแนนในคาบนี้" description="สร้างงานการมีส่วนร่วมเต็ม 10 คะแนน แล้วบันทึกเฉพาะนักเรียนที่ต้องการได้ทันที" /> : null}
     {!assessment ? <AppButton label={create.isPending ? "กำลังสร้าง…" : "สร้างคะแนนการมีส่วนร่วม"} onPress={() => create.mutate()} disabled={!isOnline || create.isPending} /> : null}
     {create.error ? <Text accessibilityRole="alert" style={[styles.error, { color: themeColors.danger }]}>{thaiErrorMessage(create.error)}</Text> : null}
-    {assessment ? gradebook.data.students.map((student) => <Card key={student.studentId}>
+    {assessment ? gradebook.data.students.map((student) => {
+      const validation = parseScoreInput(scoreValue(student.studentId), assessment.maxScore);
+      return <Card key={student.studentId}>
       <View style={styles.studentRow}>
         <StudentAvatar firstName={student.firstName} lastName={student.lastName} size={48} />
         <View style={styles.flex}><Text style={[styles.name, { color: themeColors.text }]}>{student.firstName} {student.lastName}</Text><Text style={[styles.meta, { color: themeColors.muted }]}>{student.studentNumber}</Text></View>
-        <TextInput
+        <ScoreInputField
           accessibilityLabel={`คะแนนของ ${student.firstName} ${student.lastName}`}
-          keyboardType="decimal-pad"
           value={scoreValue(student.studentId)}
           onChangeText={(value) => setValues((current) => ({ ...current, [student.studentId]: value }))}
           placeholder="—"
@@ -83,8 +91,10 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
         />
         <Text style={[styles.max, { color: themeColors.muted }]}>/ {assessment.maxScore}</Text>
       </View>
-    </Card>) : null}
-    {assessment ? <AppButton label={save.isPending ? "กำลังบันทึก…" : "บันทึกคะแนน"} onPress={() => save.mutate()} disabled={!isOnline || save.isPending} /> : null}
+      {validation.kind === "invalid" ? <Text accessibilityRole="alert" style={[styles.error, { color: themeColors.danger }]}>{validation.message}</Text> : null}
+    </Card>;
+    }) : null}
+    {assessment ? <AppButton label={save.isPending ? "กำลังบันทึก…" : "บันทึกคะแนน"} onPress={() => save.mutate()} disabled={!isOnline || save.isPending || hasInvalidScore} /> : null}
     {save.error ? <Text accessibilityRole="alert" style={[styles.error, { color: themeColors.danger }]}>{thaiErrorMessage(save.error)}</Text> : null}
   </SafeScreen>;
 }

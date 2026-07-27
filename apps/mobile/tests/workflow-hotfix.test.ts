@@ -1,0 +1,50 @@
+import { attendanceSessionPath, attendanceSummaryPath } from "@/features/attendance/attendance-navigation";
+import { invalidateSessionWorkflow } from "@/lib/query-keys";
+
+const { readFileSync } = jest.requireActual("node:fs") as { readFileSync(path: string, encoding: string): string };
+const { resolve } = jest.requireActual("node:path") as { resolve(...paths: string[]): string };
+const source = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+
+describe("teacher workflow hotfix", () => {
+  it("uses deterministic session routes for normal and deep-link attendance entry", () => {
+    expect(attendanceSessionPath("session-exact")).toBe("/sessions/session-exact");
+    expect(attendanceSummaryPath("session-exact")).toBe("/sessions/session-exact/summary");
+  });
+
+  it("keeps the unsaved guard and returns only after a successful save", () => {
+    const attendance = source("features/attendance/attendance-screen.tsx");
+    expect(attendance).toContain("hardwareBackPress");
+    expect(attendance).toContain("if (changed > 0) setExitOpen(true)");
+    expect(attendance).toContain("memoryDrafts.delete(sessionId)");
+    expect(attendance).toContain("setDraft({})");
+    expect(attendance).toContain("queryClient.setQueryData(queryKeys.attendanceSaveFeedback(sessionId), true)");
+    expect(attendance).toContain("router.replace(attendanceSessionPath(sessionId))");
+    const successBlock = attendance.slice(attendance.indexOf("onSuccess"));
+    expect(successBlock.indexOf("onSuccess")).toBeLessThan(successBlock.indexOf("router.replace(attendanceSessionPath(sessionId))"));
+    expect(attendance).toContain("saveRequested.current");
+  });
+
+  it("keeps numeric keyboard and focus props on the native score input", () => {
+    const scores = source("features/scores/score-input-field.tsx");
+    expect(scores).toContain('keyboardType="decimal-pad"');
+    expect(scores).toContain('inputMode="decimal"');
+    expect(scores).toContain("showSoftInputOnFocus");
+    expect(scores).toContain("inputRef.current?.focus()");
+  });
+
+  it("invalidates all session workflow query roots", async () => {
+    const invalidated: unknown[][] = [];
+    const client = { invalidateQueries: jest.fn(({ queryKey }) => { invalidated.push(queryKey); return Promise.resolve(); }) };
+    await invalidateSessionWorkflow(client as never, "session-1");
+    expect(invalidated).toEqual(expect.arrayContaining([
+      ["session", "session-1"], ["attendance", "session-1"], ["timeline", "session-1"],
+      ["today"], ["timetable"], ["assignments"],
+    ]));
+  });
+
+  it("navigates to summary only after server-confirmed completion", () => {
+    const session = source("features/sessions/session-screen.tsx");
+    expect(session).toContain('completed.status !== "completed"');
+    expect(session.indexOf("onSuccess")).toBeLessThan(session.indexOf("router.replace(`/sessions/${id}/summary`)"));
+  });
+});

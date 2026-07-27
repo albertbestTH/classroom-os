@@ -25,6 +25,7 @@ The Sprint 2 schema establishes the PostgreSQL foundation for teacher-led classr
 | `Assessment` | Scored activity for a term, classroom, subject, and teacher; optionally created in a class session. |
 | `Score` | One student's result for one assessment. |
 | `AuditLog` | Immutable tenant-scoped record of a service mutation, optional actor, target entity, safe metadata, and timestamp. |
+| `SchoolHoliday` | Tenant-scoped date-only school holiday that can pause timetable materialization for a local school date. |
 
 ## Major relationships
 
@@ -88,6 +89,8 @@ erDiagram
 
 `School.id` is the tenant key. All operational entities carry `schoolId`, even when the school could be reached through another relationship. This denormalized tenant key provides predictable query scoping and tenant-first indexes for common request paths.
 
+`SchoolHoliday` is also scoped by `schoolId` and uses a unique `(schoolId, localDate)` constraint. Active holidays are checked before a timetable entry is materialized into a `ClassSession`; the Today timetable response returns holiday details and no generated class list for that date. Holidays do not create attendance records, scores, or cancelled sessions by themselves.
+
 Service-layer rules are mandatory:
 
 1. Resolve the active school from trusted authorization context.
@@ -129,8 +132,8 @@ flowchart LR
     E --> F[Student scores]
 ```
 
-1. A `TeachingAssignment` establishes who teaches a subject to a classroom during a term.
-2. A `TimetableEntry` captures the recurring weekday, start/end time, room, teacher, class, and subject. Separate uniqueness constraints prevent a teacher or classroom from being double-booked at the same start time.
+1. A `TeachingAssignment` establishes who teaches a subject to a classroom during a term. One assignment may own any number of operationally valid weekly `TimetableEntry` rows; Monday, Wednesday, and Friday lessons reuse the same assignment rather than duplicating its authorization context.
+2. Each `TimetableEntry` captures one recurring weekday, start/end time, room, teacher, class, and subject. Entries are never merged by assignment. Separate uniqueness constraints prevent a teacher or classroom from being double-booked at the same start time.
 3. An optional `TimetableCoverage` request delegates one local date. It remains `pending` until the substitute (or a manager) accepts it. Cover and swap acceptance checks timetable conflicts; cancellation/decline does not grant access. The original timetable and teaching assignment are never reassigned.
 4. The application materializes a dated `ClassSession`. The session stores the original teacher, classroom, subject, and scheduled timestamps as an operational snapshot and may reference the originating timetable entry. Ad hoc sessions leave that reference empty.
 5. The current term's `ClassEnrollment` rows determine the expected roster. Each student can have at most one attendance record per session.

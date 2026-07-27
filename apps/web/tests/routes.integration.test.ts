@@ -13,6 +13,7 @@ import {
   PUT as putAttendance,
 } from "@/app/api/sessions/[id]/attendance/route";
 import { GET as getSession } from "@/app/api/sessions/[id]/route";
+import { POST as endSession } from "@/app/api/sessions/[id]/end/route";
 import { POST as startSession } from "@/app/api/sessions/[id]/start/route";
 import { GET as getStaff } from "@/app/api/staff/route";
 import { GET as getStudents, POST as postStudent } from "@/app/api/students/route";
@@ -230,6 +231,12 @@ describe("authenticated API routes", () => {
       )).status,
     ).toBe(403);
     expect(
+      (await endSession(
+        apiRequest(`/api/sessions/${sessionC.id}/end`, { token: login.token, method: "POST", json: {} }),
+        { params: Promise.resolve({ id: sessionC.id }) },
+      )).status,
+    ).toBe(403);
+    expect(
       (await getSession(apiRequest(`/api/sessions/${otherTenant.school.id}`, { token: login.token }), {
         params: Promise.resolve({ id: otherTenant.school.id }),
       })).status,
@@ -267,6 +274,30 @@ describe("authenticated API routes", () => {
       { params: Promise.resolve({ id: sessionB.id }) },
     );
     expect(attendanceB.status).toBe(200);
+
+    expect((await startSession(
+      apiRequest(`/api/sessions/${sessionA.id}/start`, { token: login.token, method: "POST", json: {} }),
+      { params: Promise.resolve({ id: sessionA.id }) },
+    )).status).toBe(200);
+    expect((await putAttendance(
+      apiRequest(`/api/sessions/${sessionA.id}/attendance`, {
+        token: login.token, method: "PUT",
+        json: { classroomId: tenant.classroom.id, records: [{ studentId: tenant.student.id, status: "present" }] },
+      }),
+      { params: Promise.resolve({ id: sessionA.id }) },
+    )).status).toBe(200);
+    const ended = await endSession(
+      apiRequest(`/api/sessions/${sessionA.id}/end`, { token: login.token, method: "POST", json: {} }),
+      { params: Promise.resolve({ id: sessionA.id }) },
+    );
+    expect(ended.status).toBe(200);
+    const endedPayload = await ended.json();
+    expect(endedPayload).toMatchObject({ data: { id: sessionA.id, status: "completed" } });
+    expect(JSON.stringify(endedPayload)).not.toMatch(/password|token|cookie/i);
+    const freshCompleted = await getSession(apiRequest(`/api/sessions/${sessionA.id}`, { token: login.token }), {
+      params: Promise.resolve({ id: sessionA.id }),
+    });
+    await expect(freshCompleted.json()).resolves.toMatchObject({ data: { status: "completed" } });
 
     const assessmentA = await prisma.assessment.create({
       data: {

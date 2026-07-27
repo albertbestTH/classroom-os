@@ -45,3 +45,19 @@ export function thaiApiError(error: unknown): string {
   };
   return messages[error.code] ?? "ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง";
 }
+
+export function timetableThaiApiError(error: unknown, operation: "create" | "update"): string {
+  if (!(error instanceof ApiClientError)) return "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง";
+  if (error.code === "CONFLICT") {
+    if (error.message === "An identical timetable entry already exists.") return "มีคาบเรียนนี้ในวันและเวลาเดียวกันอยู่แล้ว";
+    if (error.message === "The teacher already has an overlapping timetable entry.") return "ครูมีคาบเรียนอื่นในช่วงเวลานี้แล้ว";
+    if (error.message === "The classroom already has an overlapping timetable entry.") return "ห้องเรียนมีคาบอื่นในช่วงเวลานี้แล้ว";
+  }
+  if (error.code === "VALIDATION_ERROR" && (
+    error.message === "endTime must be later than startTime." ||
+    error.fieldErrors?.endTime?.includes("endTime must be later than startTime.")
+  )) return "เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด";
+  if (error.code === "NOT_FOUND") return operation === "update" ? "ไม่พบคาบเรียนที่ต้องการแก้ไข" : "ไม่พบงานสอนที่เลือก";
+  if (error.code === "FORBIDDEN" || error.code === "TENANT_ACCESS_DENIED") return operation === "update" ? "คุณไม่มีสิทธิ์แก้ไขคาบเรียนนี้" : "คุณไม่มีสิทธิ์เพิ่มคาบเรียนนี้";
+  return thaiApiError(error);
+}

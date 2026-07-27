@@ -11,6 +11,7 @@ import { createAuditLogForSchool } from "../repositories/audit.repository.js";
 import { requireTenantReferencesForSchool } from "../repositories/reference.repository.js";
 import {
   createTimetableEntryForSchool,
+  findExactTimetableEntryForSchool,
   findTimetableOverlapForSchool,
   listTimetableEntriesForSchool,
   requireMatchingTeachingAssignmentForSchool,
@@ -40,6 +41,14 @@ function throwOverlap(
   );
 }
 
+function throwExactDuplicate(): never {
+  throw domainError(
+    "CONFLICT",
+    "An identical timetable entry already exists.",
+    { conflict: "exact_duplicate" },
+  );
+}
+
 export function createTimetableEntry(
   input: CreateTimetableEntryInput,
 ): Promise<TimetableEntryResult> {
@@ -49,6 +58,22 @@ export function createTimetableEntry(
     const endTime = clockStringToDate(parsed.endTime);
 
     return getPrismaClient().$transaction(async (transaction) => {
+      const assignment = await requireMatchingTeachingAssignmentForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        termId: parsed.termId,
+        teacherId: parsed.teacherId,
+        classroomId: parsed.classroomId,
+        subjectId: parsed.subjectId,
+      });
+      const exact = await findExactTimetableEntryForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        termId: parsed.termId,
+        teachingAssignmentId: assignment.id,
+        weekday: parsed.weekday,
+        startTime,
+        endTime,
+      });
+      if (exact) throwExactDuplicate();
       const overlap = await findTimetableOverlapForSchool(transaction, {
         ...parsed,
         startTime,
@@ -125,6 +150,16 @@ export function updateTimetableEntry(
       });
 
       if (parsed.isActive ?? existing.isActive) {
+        const exact = await findExactTimetableEntryForSchool(transaction, {
+          schoolId: parsed.schoolId,
+          termId: existing.termId,
+          teachingAssignmentId: assignment.id,
+          weekday,
+          startTime,
+          endTime,
+          excludeTimetableEntryId: existing.id,
+        });
+        if (exact) throwExactDuplicate();
         const overlap = await findTimetableOverlapForSchool(transaction, {
           schoolId: parsed.schoolId,
           termId: existing.termId,

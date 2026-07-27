@@ -16,6 +16,7 @@ import { requireRole, requireSchoolAccess } from "../auth/authorization.js";
 import { domainError } from "../domain-errors.js";
 import { requireTermForSchool } from "../repositories/academic-calendar.repository.js";
 import { createAuditLogForSchool } from "../repositories/audit.repository.js";
+import { findActiveSchoolHolidayForSchool } from "../repositories/school-holiday.repository.js";
 import { requireSchoolSettingsForSchool } from "../repositories/reference.repository.js";
 import {
   cancelClassSessionForSchool,
@@ -38,6 +39,7 @@ import {
   startClassSessionSchema,
 } from "../validation.js";
 import { executeTenantService, toClassSessionResult } from "./service-utils.js";
+import { holidayConflictError } from "./school-holiday.service.js";
 import { isoWeekday, localDateForInstant, localDateTimeToInstant } from "./timezone.js";
 
 const sessionIdSchema = z.object({
@@ -111,6 +113,11 @@ export function materializeClassSession(
       if (parsed.localDate < startsOn || parsed.localDate > endsOn) {
         throw domainError("VALIDATION_ERROR", "The class date is outside the term.");
       }
+      const holiday = await findActiveSchoolHolidayForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        localDate: new Date(`${parsed.localDate}T00:00:00.000Z`),
+      });
+      if (holiday) holidayConflictError(holiday.name);
       const scheduledStart = localDateTimeToInstant(
         parsed.localDate,
         clock(entry.startTime),

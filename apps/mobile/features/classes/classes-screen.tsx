@@ -1,7 +1,7 @@
-import type { ClassroomResult, TeachingAssignmentResult, TimetableCoverageResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
+import type { ClassSessionResult, ClassroomResult, TeachingAssignmentResult, TimetableCoverageResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppButton, AppHeader, Card, Chip, EmptyState, ErrorState, ListTile, OfflineBanner, SafeScreen, SearchBar, SectionHeader, SkeletonCard, StatusBadge, ThemedText } from "@/components/ui/primitives";
@@ -13,6 +13,8 @@ import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
 import { matchesSearch } from "@/lib/search";
 import { formatTimetableTime } from "@/lib/time";
+import { queryPolicyForKey } from "@/lib/operational-query-policy";
+import { invalidateSessionWorkflow, queryKeys } from "@/lib/query-keys";
 
 const weekdays = [
   { value: 1, label: "วันจันทร์" }, { value: 2, label: "วันอังคาร" }, { value: 3, label: "วันพุธ" },
@@ -30,22 +32,34 @@ export function ClassesScreen() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
   const [assignments, timetable, classrooms, today, coverages] = useQueries({ queries: [
-    { queryKey: ["assignments"], queryFn: () => apiRequest<TeachingAssignmentResult[]>("/api/teaching-assignments", { token }) },
-    { queryKey: ["timetable"], queryFn: () => apiRequest<TimetableEntryResult[]>("/api/timetable", { token }) },
-    { queryKey: ["classrooms"], queryFn: () => apiRequest<ClassroomResult[]>("/api/classrooms", { token }) },
-    { queryKey: ["today"], queryFn: () => apiRequest<TodayTimetableResult>("/api/me/today", { token }) },
-    { queryKey: ["timetable-coverages"], queryFn: () => apiRequest<TimetableCoverageResult[]>("/api/timetable/coverage", { token }) },
+    { queryKey: queryKeys.assignments, queryFn: () => apiRequest<TeachingAssignmentResult[]>("/api/teaching-assignments", { token }), ...queryPolicyForKey(queryKeys.assignments) },
+    { queryKey: queryKeys.timetable, queryFn: () => apiRequest<TimetableEntryResult[]>("/api/timetable", { token }), ...queryPolicyForKey(queryKeys.timetable) },
+    { queryKey: queryKeys.classrooms, queryFn: () => apiRequest<ClassroomResult[]>("/api/classrooms", { token }), ...queryPolicyForKey(queryKeys.classrooms) },
+    { queryKey: queryKeys.today, queryFn: () => apiRequest<TodayTimetableResult>("/api/me/today", { token }), ...queryPolicyForKey(queryKeys.today) },
+    { queryKey: queryKeys.coverages, queryFn: () => apiRequest<TimetableCoverageResult[]>("/api/timetable/coverage", { token }), ...queryPolicyForKey(queryKeys.coverages) },
   ] });
+  const refetchAssignments = assignments.refetch;
+  const refetchTimetable = timetable.refetch;
+  const refetchToday = today.refetch;
+  const refetchCoverages = coverages.refetch;
+  const initialFocus = useRef(true);
+  useFocusEffect(useCallback(() => {
+    if (initialFocus.current) { initialFocus.current = false; return; }
+    if (!isOnline) return;
+    void refetchAssignments(); void refetchTimetable(); void refetchToday(); void refetchCoverages();
+  }, [isOnline, refetchAssignments, refetchCoverages, refetchTimetable, refetchToday]));
   const start = useMutation({
     mutationFn: async (item: TodayClassResult) => {
       const session = item.session ?? await apiRequest<{ id: string }>(`/api/timetable/${item.timetableEntry.id}/materialize`, { method: "POST", token, body: { localDate: today.data?.localDate } });
-      return apiRequest<{ id: string }>(`/api/sessions/${session.id}/start`, { method: "POST", token, body: {} });
+      const live = await apiRequest<ClassSessionResult>(`/api/sessions/${session.id}/start`, { method: "POST", token, body: {} });
+      if (live.status !== "live") throw new Error("Session start was not confirmed by the server.");
+      return live;
     },
-    onSuccess: async (session) => { await queryClient.invalidateQueries({ queryKey: ["today"] }); router.push(`/sessions/${session.id}`); },
+    onSuccess: async (session) => { queryClient.setQueryData(queryKeys.session(session.id), session); await invalidateSessionWorkflow(queryClient, session.id); router.push(`/sessions/${session.id}`); },
   });
   const resolveCoverage = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "active" | "declined" }) => apiRequest<TimetableCoverageResult>(`/api/timetable/coverage/${id}`, { method: "PATCH", token, body: { status } }),
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["timetable-coverages"] }), queryClient.invalidateQueries({ queryKey: ["today"] })]); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.coverages }), queryClient.invalidateQueries({ queryKey: queryKeys.today }), queryClient.invalidateQueries({ queryKey: queryKeys.timetable })]); },
   });
 
   const isLoading = assignments.isLoading || timetable.isLoading || classrooms.isLoading || today.isLoading || coverages.isLoading;

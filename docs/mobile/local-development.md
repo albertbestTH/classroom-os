@@ -35,6 +35,10 @@ pnpm --filter mobile android:dev-build
 
 The first build installs the required SDK/NDK components and can take considerably longer. `apps/mobile/eas.json` also defines internal development and preview APK profiles; deployment credentials and the API URL must be injected by the build environment.
 
+### Android emulator keyboard UAT
+
+When testing score entry, tap both the visible score field and its surrounding touch area. The Android numeric/decimal soft keyboard should open and accept decimal values. If the emulator receives focus but does not display the soft keyboard, open **Extended controls → Settings → General** and disable **Enable keyboard input**, or in Android Studio's Device Manager edit the virtual device and turn off **Enable keyboard input**. Android may hide its soft keyboard while a physical computer keyboard is connected; this emulator setting is independent of the app's input configuration.
+
 On Windows, CMake used by `react-native-worklets` can exceed the legacy path limit when the repository has a long absolute path. Keep the checkout path short or use a local short pnpm virtual store before building, for example `pnpm install --force --virtual-store-dir C:\.cos-pnpm`. This path is machine-local and must not be committed. For an x86_64 Android Studio emulator, a generated native project can be validated with `gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64`; normal EAS builds create all configured production architectures remotely.
 
 After installing a development build and preparing a synthetic teacher account, install Maestro and run `pnpm --filter mobile e2e:android` with `MAESTRO_TEST_EMAIL` and `MAESTRO_TEST_PASSWORD`. The smoke test clears application state and never uses real student data.

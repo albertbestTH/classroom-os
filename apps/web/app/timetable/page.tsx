@@ -1,14 +1,16 @@
 import {
   listAcademicYears,
+  listSchoolHolidays,
   listTeachingAssignments,
   listTerms,
-  listTimetableEntries,
   listTimetableCoverages,
+  listTimetableEntries,
 } from "@classroom-os/database";
 
 import { AppShell } from "@/components/app-shell";
-import { TimetableManager } from "@/components/classroom/timetable-manager";
 import { CoverageManager } from "@/components/classroom/coverage-manager";
+import { HolidayManager } from "@/components/classroom/holiday-manager";
+import { TimetableManager } from "@/components/classroom/timetable-manager";
 import { PageHeader } from "@/components/page-header";
 import { requireWebSession } from "@/lib/auth";
 
@@ -20,28 +22,63 @@ export default async function TimetablePage() {
     listTeachingAssignments({ auth: context }),
   ]);
   const currentYear = years.find((year) => year.isCurrent) ?? null;
-  const currentTerm = terms.find((term) => term.isCurrent && (!currentYear || term.academicYearId === currentYear.id)) ?? null;
-  const allEntries = currentTerm ? await listTimetableEntries({
-    schoolId: context.schoolId,
-    termId: currentTerm.id,
-  }) : [];
-  const entries = context.role === "TEACHER"
-    ? allEntries.filter((entry) => entry.teacherId === context.teacherId)
-    : allEntries;
-  const currentAssignments = currentTerm ? assignments.filter((item) => item.termId === currentTerm.id) : [];
+  const currentTerm =
+    terms.find(
+      (term) =>
+        term.isCurrent && (!currentYear || term.academicYearId === currentYear.id),
+    ) ?? null;
+  const allEntries = currentTerm
+    ? await listTimetableEntries({
+        schoolId: context.schoolId,
+        termId: currentTerm.id,
+      })
+    : [];
+  const entries =
+    context.role === "TEACHER"
+      ? allEntries.filter((entry) => entry.teacherId === context.teacherId)
+      : allEntries;
+  const currentAssignments = currentTerm
+    ? assignments.filter((item) => item.termId === currentTerm.id)
+    : [];
   const coverages = await listTimetableCoverages({
     schoolId: context.schoolId,
     teacherId: context.role === "TEACHER" ? context.teacherId ?? undefined : undefined,
   });
+  const holidays = currentTerm
+    ? await listSchoolHolidays({
+        schoolId: context.schoolId,
+        from: currentTerm.startsOn,
+        to: currentTerm.endsOn,
+      })
+    : [];
 
   return (
     <AppShell>
       <PageHeader
         eyebrow={currentTerm ? `${currentTerm.name} · ${currentTerm.academicYearName}` : "ยังไม่มีภาคเรียนปัจจุบัน"}
         title="ตารางสอน"
-        description="จัดตารางรายสัปดาห์แยกตามครู ห้องเรียน รายวิชา และงานสอน"
+        description="จัดตารางรายสัปดาห์ แทนคาบเรียน และปฏิทินวันหยุดของโรงเรียน"
       />
-      {!currentTerm ? <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">กำหนดปีการศึกษาและภาคเรียนปัจจุบันก่อนสร้างตารางสอน</div> : <><TimetableManager entries={entries} assignments={currentAssignments} role={context.role} /><div className="mt-6"><CoverageManager entries={allEntries} coverages={coverages} role={context.role} teacherId={context.teacherId} /></div></>}
+      {!currentTerm ? (
+        <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+          กำหนดปีการศึกษาและภาคเรียนปัจจุบันก่อนสร้างตารางสอน
+        </div>
+      ) : (
+        <>
+          <TimetableManager entries={entries} assignments={currentAssignments} role={context.role} />
+          <div className="mt-6">
+            <CoverageManager
+              entries={allEntries}
+              coverages={coverages}
+              role={context.role}
+              teacherId={context.teacherId}
+            />
+          </div>
+          <div className="mt-6">
+            <HolidayManager holidays={holidays} role={context.role} />
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }

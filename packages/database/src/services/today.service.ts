@@ -5,6 +5,7 @@ import type {
 } from "@classroom-os/types";
 
 import { getPrismaClient } from "../client.js";
+import { findActiveSchoolHolidayForSchool } from "../repositories/school-holiday.repository.js";
 import { listClassSessionsForSchool, requireClassSessionDetailsForSchool } from "../repositories/session.repository.js";
 import { requireSchoolSettingsForSchool } from "../repositories/reference.repository.js";
 import { listTimetableEntriesForSchool } from "../repositories/timetable.repository.js";
@@ -12,6 +13,7 @@ import { listCoveragesForSchool } from "../repositories/timetable-coverage.repos
 import { listAcademicYears, listTerms } from "./academic-calendar.service.js";
 import { executeTenantService, toClassSessionResult, toTimetableEntryResult } from "./service-utils.js";
 import { isoWeekday, localDateTimeToInstant, schoolDayBounds } from "./timezone.js";
+import { toSchoolHolidayResult } from "./school-holiday.service.js";
 import { toTimetableCoverageResult } from "./timetable-coverage.service.js";
 
 export function getTodayTimetable(input: {
@@ -24,6 +26,11 @@ export function getTodayTimetable(input: {
     const prisma = getPrismaClient();
     const school = await requireSchoolSettingsForSchool(prisma, input);
     const day = schoolDayBounds(school.timezone, input.now);
+    const holiday = await findActiveSchoolHolidayForSchool(prisma, {
+      schoolId: input.schoolId,
+      localDate: new Date(`${day.localDate}T00:00:00.000Z`),
+    });
+    const holidayResult = holiday ? toSchoolHolidayResult(holiday) : null;
     const years = await listAcademicYears({ schoolId: input.schoolId });
     const terms = await listTerms({ schoolId: input.schoolId });
     const currentAcademicYear = years.find((year) => year.isCurrent) ?? null;
@@ -39,6 +46,22 @@ export function getTodayTimetable(input: {
         timezone: school.timezone,
         currentAcademicYear,
         currentTerm: null,
+        holiday: holidayResult,
+        classes: [],
+        nextClass: null,
+        completedCount: 0,
+        cancelledCount: 0,
+        missedCount: 0,
+        incompleteAttendanceCount: 0,
+      };
+    }
+    if (holidayResult) {
+      return {
+        localDate: day.localDate,
+        timezone: school.timezone,
+        currentAcademicYear,
+        currentTerm,
+        holiday: holidayResult,
         classes: [],
         nextClass: null,
         completedCount: 0,
@@ -145,6 +168,7 @@ export function getTodayTimetable(input: {
       timezone: school.timezone,
       currentAcademicYear,
       currentTerm,
+      holiday: holidayResult,
       classes,
       nextClass,
       completedCount: classes.filter((item) => item.status === "completed").length,

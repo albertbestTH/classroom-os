@@ -156,6 +156,33 @@ export async function findTimetableOverlapForSchool(
   });
 }
 
+export async function findExactTimetableEntryForSchool(
+  client: TimetableClient,
+  input: TenantScope & {
+    termId: string;
+    teachingAssignmentId: string;
+    weekday: number;
+    startTime: Date;
+    endTime: Date;
+    excludeTimetableEntryId?: string;
+  },
+): Promise<Pick<TimetableEntry, "id"> | null> {
+  const schoolId = requireSchoolId(input);
+  return client.timetableEntry.findFirst({
+    where: {
+      schoolId,
+      termId: input.termId,
+      teachingAssignmentId: input.teachingAssignmentId,
+      weekday: input.weekday,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      isActive: true,
+      ...(input.excludeTimetableEntryId ? { id: { not: input.excludeTimetableEntryId } } : {}),
+    },
+    select: { id: true },
+  });
+}
+
 export async function createTimetableEntryForSchool(
   client: TimetableClient,
   input: TenantScope & { data: TimetableWriteData },

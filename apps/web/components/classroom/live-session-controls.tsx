@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { requestApi, thaiApiError } from "@/lib/client-api";
+import { attendanceActionLabel, type AttendanceSummary } from "@/lib/attendance-summary";
+import { SessionFreshness } from "./session-freshness";
 
 function elapsedLabel(startedAt: string | null, now: number) {
   if (!startedAt || now === 0) return "00:00";
@@ -13,7 +15,7 @@ function elapsedLabel(startedAt: string | null, now: number) {
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function LiveSessionControls({ session, role }: { session: ClassSessionResult; role: UserRole }) {
+export function LiveSessionControls({ session, role, attendance }: { session: ClassSessionResult; role: UserRole; attendance: AttendanceSummary }) {
   const router = useRouter();
   const [now, setNow] = useState(0);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -61,9 +63,10 @@ export function LiveSessionControls({ session, role }: { session: ClassSessionRe
 
   return (
     <div className="space-y-4">
+      <SessionFreshness status={session.status} scheduledStart={session.scheduledStart} scheduledEnd={session.scheduledEnd} />
       {session.status === "live" ? <div className="rounded-2xl bg-blue-600 p-6 text-center text-white"><p className="text-sm font-semibold text-blue-100">เวลาที่สอนไปแล้ว</p><p className="mt-2 font-mono text-5xl font-bold tabular-nums" aria-live="off">{elapsedLabel(session.startedAt, now)}</p></div> : null}
       {session.status === "scheduled" ? <button type="button" onClick={start} disabled={pending} className="min-h-14 w-full rounded-xl bg-blue-600 px-6 text-lg font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-60">{pending ? "กำลังเริ่ม…" : "เริ่มคาบเรียน"}</button> : null}
-      {session.status === "live" ? <div className="grid gap-3 sm:grid-cols-2"><Link href={`/sessions/${session.id}/attendance?classroomId=${session.classroomId}`} className="inline-flex min-h-14 items-center justify-center rounded-xl bg-blue-600 px-5 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">เช็กชื่อ</Link><button type="button" onClick={() => setConfirmEnd(true)} className="min-h-14 rounded-xl border border-red-300 bg-white px-5 text-base font-bold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2">จบคาบเรียน</button></div> : null}
+      {session.status === "live" ? <div className="grid gap-3 sm:grid-cols-3"><Link aria-label={`${attendanceActionLabel(attendance, session.status)} บันทึกแล้ว ${attendance.recorded} จาก ${attendance.enrolled} คน`} href={`/sessions/${session.id}/attendance?classroomId=${session.classroomId}`} className="inline-flex min-h-14 items-center justify-center rounded-xl bg-blue-600 px-5 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">{attendanceActionLabel(attendance, session.status)}</Link><Link href={`/sessions/${session.id}/scores`} className="inline-flex min-h-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-5 text-base font-bold text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">คะแนนด่วน</Link><button type="button" onClick={() => setConfirmEnd(true)} className="min-h-14 rounded-xl border border-red-300 bg-white px-5 text-base font-bold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2">จบคาบเรียน</button></div> : null}
       {session.status === "completed" ? <Link href={`/sessions/${session.id}/summary`} className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-slate-900 px-5 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">ดูสรุปคาบเรียน</Link> : null}
       {session.status === "cancelled" ? <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><p className="font-bold">คาบเรียนถูกยกเลิก</p><p className="mt-2 text-sm">เหตุผล: {session.cancellationReason ?? "ไม่ระบุ"}</p><p className="mt-2 text-xs">ข้อมูลคาบและการเข้าเรียนเป็นแบบอ่านอย่างเดียว</p></div> : null}
       {canCancel ? <button type="button" onClick={() => setConfirmCancel(true)} className="min-h-11 w-full rounded-xl px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">ยกเลิกคาบเรียน</button> : null}

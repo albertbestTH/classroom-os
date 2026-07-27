@@ -2,10 +2,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   confirmOwnEmailChange,
+  confirmPasswordReset,
   confirmSchoolRegistration,
   getSchoolProfile,
   hashPassword,
   requestOwnEmailChange,
+  requestPasswordReset,
   requestSchoolRegistration,
   updateOwnProfile,
   updateSchoolProfile,
@@ -48,6 +50,20 @@ describe("profile, school profile, and self-registration", () => {
     expect(stored.tokenHash).not.toBe(request.developmentToken);
     await confirmOwnEmailChange({ token: request.developmentToken! });
     await expect(prisma.user.findUniqueOrThrow({ where: { id: tenant.user.id } })).resolves.toMatchObject({ email: `synthetic-profile-${tenant.user.id}@example.test` });
+  });
+
+  it("resets passwords with a hashed token and revokes active sessions", async () => {
+    const tenant = await createSyntheticTenant(prisma, schools, "profile-password-reset");
+    const oldPassword = "Synthetic!Old2026";
+    await prisma.user.update({ where: { id: tenant.user.id }, data: { passwordHash: await hashPassword(oldPassword) } });
+    const session = await import("../../src/auth/authentication.service.js").then((auth) => auth.authenticateWithPassword({ email: tenant.user.email, password: oldPassword }));
+    const request = await requestPasswordReset({ email: tenant.user.email });
+    expect(request.developmentToken).toBeTruthy();
+    const stored = await prisma.passwordResetRequest.findFirstOrThrow({ where: { userId: tenant.user.id } });
+    expect(stored.tokenHash).not.toBe(request.developmentToken);
+    await confirmPasswordReset({ token: request.developmentToken!, newPassword: "Synthetic!New2026" });
+    await expect(import("../../src/auth/authentication.service.js").then((auth) => auth.resolveServerSession(session.token))).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+    await expect(import("../../src/auth/authentication.service.js").then((auth) => auth.authenticateWithPassword({ email: tenant.user.email, password: "Synthetic!New2026" }))).resolves.toBeTruthy();
   });
 
   it("creates a new isolated school and owner only after verification", async () => {

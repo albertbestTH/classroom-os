@@ -63,6 +63,7 @@ Authentication codes map separately: `UNAUTHENTICATED` to 401, `INVALID_CREDENTI
 - `GET|POST /api/classrooms`; `GET|PATCH /api/classrooms/:id`
 - `GET|POST /api/timetable`; `PATCH /api/timetable/:id`
 - `GET|POST /api/timetable/coverage`; `PATCH /api/timetable/coverage/:id`
+- `GET|POST /api/holidays`; `PATCH /api/holidays/:id`
 - `POST /api/sessions` (compatibility materialization); `GET /api/sessions/:id`; `POST /start`; `POST /end`; `GET /timeline`
 - `GET|PUT /api/sessions/:id/attendance`; `POST /api/sessions/:id/attendance/corrections`
 - `POST /api/sessions/:id/cancel`
@@ -92,7 +93,8 @@ Creating or marking an academic year current clears the prior current year and a
 
 - `GET /api/me/today` returns the visible current-term schedule, next class, completed/missed/cancelled/incomplete-attendance counts, and school timezone. Teachers receive only their own assignment rows.
 - Accepted dated coverage replaces a covered-away row with the effective cover/swap row for that teacher. The result includes coverage metadata, but the timetable/session retains its original teaching assignment so roster, attendance, and scores remain in the original class.
-- `GET|POST /api/timetable` and `PATCH /api/timetable/:id` return display-safe assignment labels and enforce valid assignments plus teacher/classroom interval conflicts.
+- `GET|POST /api/timetable` and `PATCH /api/timetable/:id` return display-safe assignment labels. One teaching assignment may have multiple weekly entries. Create and update share authoritative exact-duplicate and exclusive-end teacher/classroom overlap checks; update excludes its own row. Safe conflict messages distinguish duplicate, teacher, and classroom conflicts without exposing database details.
+- `GET|POST /api/holidays` and `PATCH /api/holidays/:id` manage tenant-scoped school holidays. Owners/admins may create or update holidays; teachers may read them through authenticated timetable/today views. Active holidays prevent timetable materialization for that local date.
 - `POST /api/timetable/:id/materialize` accepts `{ "localDate": "YYYY-MM-DD" }`. It derives all trusted context from the timetable entry and returns the existing occurrence on a safe retry.
 - `GET /api/sessions/:id`, `POST /start`, `POST /end`, and `POST /cancel` enforce exact assignment access and the forward-only state graph. Start/end accept optional `expectedUpdatedAt`; live cancellation is manager-only and every cancellation requires a reason.
 - `GET|PUT /api/sessions/:id/attendance` uses the canonical session classroom and only active enrolled students. PUT accepts a batch plus the matching `classroomId`; identical retries are no-ops. `POST /attendance/corrections` is owner/admin-only, completed-only, reason-required, and version-checked.

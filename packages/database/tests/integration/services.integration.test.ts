@@ -204,6 +204,10 @@ describe("tenant application services", () => {
       startTime: "08:30",
       endTime: "09:10",
     };
+    await prisma.teachingAssignment.createMany({ data: [
+      { schoolId: tenant.school.id, termId: tenant.term.id, teacherId: tenant.teacher.id, classroomId: otherClassroom.id, subjectId: tenant.subject.id },
+      { schoolId: tenant.school.id, termId: tenant.term.id, teacherId: otherTeacher.id, classroomId: tenant.classroom.id, subjectId: tenant.subject.id },
+    ] });
 
     await expect(
       createTimetableEntry({

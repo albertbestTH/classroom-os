@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   endClassSession,
+  getClassSession,
   getSessionAttendanceRoster,
   getTodayTimetable,
   listClassSessionTimeline,
@@ -112,7 +113,10 @@ describe("operational classroom workflow", () => {
     await updateAttendanceBatch({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "present" }] });
     const roster = await getSessionAttendanceRoster({ schoolId: tenant.school.id, sessionId: sessionA.id });
     expect(roster.students.map((student) => student.studentId)).toEqual([tenant.student.id]);
-    await endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id });
+    const completed = await endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id });
+    expect(completed.status).toBe("completed");
+    expect((await getClassSession({ schoolId: tenant.school.id, sessionId: sessionA.id })).status).toBe("completed");
+    await expect(endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id })).resolves.toMatchObject({ status: "completed" });
     await expect(updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "late" }] })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
     expect((await listClassSessionTimeline({ schoolId: tenant.school.id, sessionId: sessionA.id })).map((event) => event.eventType)).toEqual(["SESSION_STARTED", "ATTENDANCE_UPDATED", "SESSION_ENDED"]);
   });

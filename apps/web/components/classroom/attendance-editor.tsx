@@ -76,6 +76,8 @@ export function AttendanceEditor({
 
   function markAllPresent() {
     if (readOnly) return;
+    const hasExisting = initial.students.some((student) => student.status && student.status !== "present");
+    if (hasExisting && !window.confirm("ตั้งทุกคนเป็นมา?\nสถานะที่บันทึกไว้ของนักเรียนทุกคนจะเปลี่ยนเป็น ‘มา’ คุณยังสามารถแก้ไขรายคนก่อนบันทึกได้")) return;
     setValues(Object.fromEntries(initial.students.map((item) => [item.studentId, "present"])));
     setFeedback(null);
   }
@@ -100,6 +102,7 @@ export function AttendanceEditor({
       setSaved({ ...values });
       setFeedback({ type: "success", text: `บันทึกการเข้าเรียน ${records.length} คนแล้ว` });
       window.sessionStorage.removeItem(storageKey);
+      router.replace(`/sessions/${initial.sessionId}`);
     } catch (saveError) {
       setFeedback({ type: "error", text: `${thaiApiError(saveError)} ลองใหม่ได้โดยข้อมูลที่เลือกไว้จะไม่หาย` });
     } finally {

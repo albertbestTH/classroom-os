@@ -13,6 +13,7 @@ import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
+import { invalidateSessionWorkflow, queryKeys } from "@/lib/query-keys";
 
 import { groupTodayClasses, timelineStatus } from "./today-presentation";
 
@@ -28,14 +29,16 @@ export function TodayScreen() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
-  const today = useAuthenticatedQuery<TodayTimetableResult>(["today"], "/api/me/today");
+  const today = useAuthenticatedQuery<TodayTimetableResult>(queryKeys.today, "/api/me/today");
   const groups = useMemo(() => groupTodayClasses(today.data?.classes ?? []), [today.data?.classes]);
   const start = useMutation({
     mutationFn: async (item: TodayClassResult) => {
       const session = item.session ?? await apiRequest<ClassSessionResult>(`/api/timetable/${item.timetableEntry.id}/materialize`, { method: "POST", token, body: { localDate: today.data?.localDate } });
-      return apiRequest<ClassSessionResult>(`/api/sessions/${session.id}/start`, { method: "POST", token, body: {} });
+      const live = await apiRequest<ClassSessionResult>(`/api/sessions/${session.id}/start`, { method: "POST", token, body: {} });
+      if (live.status !== "live") throw new Error("Session start was not confirmed by the server.");
+      return live;
     },
-    onSuccess: async (session) => { await queryClient.invalidateQueries({ queryKey: ["today"] }); router.push(`/sessions/${session.id}`); },
+    onSuccess: async (session) => { queryClient.setQueryData(queryKeys.session(session.id), session); await invalidateSessionWorkflow(queryClient, session.id); router.push(`/sessions/${session.id}`); },
   });
 
   if (today.isLoading) return <SafeScreen><SkeletonCard /><SkeletonCard /><SkeletonCard /></SafeScreen>;
@@ -56,6 +59,15 @@ export function TodayScreen() {
   return <SafeScreen stickyHeaderIndices={live ? [2] : undefined} refreshControl={<RefreshControl refreshing={today.isRefetching} onRefresh={() => void today.refetch()} tintColor={colors.primary} />}>
     <OfflineBanner visible={!isOnline} lastUpdated={today.dataUpdatedAt} />
     <AppHeader title={`สวัสดีครับ ครู${user?.firstName ?? ""}`} subtitle={`${user?.schoolName ?? ""} · ${date}`} />
+    {data.holiday ? (
+      <Card>
+        <StatusBadge label="วันหยุด" tone="warning" />
+        <ThemedText style={styles.holidayTitle}>{data.holiday.name}</ThemedText>
+        <ThemedText tone="muted">
+          {data.holiday.description ?? "วันนี้ถูกตั้งเป็นวันหยุดของโรงเรียน จึงไม่มีคาบเรียนจากตารางสอน"}
+        </ThemedText>
+      </Card>
+    ) : null}
     <View style={[styles.pinned, live && { backgroundColor: colors.background }]}>
       {live ? <><SectionHeader title="คาบที่กำลังสอน" action={<StatusBadge label="LIVE" tone="live" />} /><SessionCard item={live} primary /></> : next ? <><SectionHeader title="คาบถัดไป" /><SessionCard item={next} primary canMutate={isOnline} onStart={(item) => start.mutate(item)} /></> : null}
     </View>
@@ -73,8 +85,8 @@ export function TodayScreen() {
         <StatusBadge label={statusLabels[item.status]} tone={item.status === "live" ? "live" : item.status === "completed" ? "success" : item.status === "cancelled" || item.status === "missed" ? "danger" : "neutral"} />
         {(item.status === "scheduled" || item.status === "live" || item.status === "completed") ? <AppButton label={item.status === "scheduled" ? "เริ่มคาบ" : item.status === "live" ? "กลับเข้าสู่คาบ" : "ดูสรุป"} tone="secondary" disabled={item.status === "scheduled" && (!isOnline || start.isPending)} onPress={() => openItem(item)} /> : null}
       </TimelineItem>)}</Timeline>
-    </Card> : null) : <EmptyState title="วันนี้ไม่มีคาบสอน" description="พักผ่อนหรือเตรียมคาบถัดไปได้เลย" />}
+    </Card> : null) : <EmptyState title={data.holiday ? "วันนี้เป็นวันหยุด" : "วันนี้ไม่มีคาบสอน"} description={data.holiday ? "ระบบจะไม่สร้างคาบเรียนจากตารางสอนในวันนี้" : "พักผ่อนหรือเตรียมคาบถัดไปได้เลย"} />}
   </SafeScreen>;
 }
 
-const styles = StyleSheet.create({ pinned: { gap: spacing.md, borderRadius: 18 }, metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md }, actionTitle: { fontSize: 17, fontWeight: "800" }, groupTitle: { fontSize: 18, fontWeight: "800" } });
+const styles = StyleSheet.create({ pinned: { gap: spacing.md, borderRadius: 18 }, metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md }, actionTitle: { fontSize: 17, fontWeight: "800" }, groupTitle: { fontSize: 18, fontWeight: "800" }, holidayTitle: { marginTop: spacing.sm, fontSize: 20, fontWeight: "900" } });

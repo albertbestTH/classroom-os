@@ -13,8 +13,10 @@ import { NextClassCard } from "@/components/dashboard/next-class-card";
 import { SessionStatusChart } from "@/components/dashboard/session-status-chart";
 import { TeacherContextFilters } from "@/components/dashboard/teacher-context-filters";
 import { PageHeader } from "@/components/page-header";
+import { OperationalFreshness } from "@/components/operational-freshness";
 import { requireWebSession } from "@/lib/auth";
 import { dashboardFiltersFromSearchParams } from "@/lib/dashboard";
+import { todayNeedsPolling } from "@/lib/operational-freshness-policy";
 
 type DashboardPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -35,6 +37,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <AppShell>
+      <OperationalFreshness poll={todayNeedsPolling(overview.today, new Date().getTime())} />
       <PageHeader
         eyebrow={`${dateLabel} · ${isTeacher ? "พื้นที่ทำงานของครู" : "พื้นที่บริหารโรงเรียน"}`}
         title={isTeacher ? `สวัสดีครับ ครู${user.firstName}` : "ภาพรวมโรงเรียน"}

@@ -1,11 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import type {
+  ChangeOwnPasswordInput,
   ConfirmEmailChangeInput,
+  ConfirmPasswordResetInput,
   ConfirmSchoolRegistrationInput,
   CurrentUserResult,
   RegisterSchoolInput,
   RequestEmailChangeInput,
+  RequestPasswordResetInput,
   SchoolProfileResult,
   SchoolRegistrationResult,
   TrustedAuthContext,
@@ -48,6 +51,17 @@ const registrationSchema = z.object({
   if (value.workspaceType === "SCHOOL" && !value.schoolCode) context.addIssue({ code: "custom", path: ["schoolCode"], message: "School code is required." });
 });
 const emailChangeSchema = z.object({ newEmail: email, currentPassword: z.string().min(1).max(1024) });
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(1024),
+  newPassword: z.string().min(12).max(128)
+    .regex(/[a-z]/).regex(/[A-Z]/).regex(/\d/).regex(/[^A-Za-z0-9]/),
+});
+const passwordResetRequestSchema = z.object({ email });
+const passwordResetConfirmSchema = z.object({
+  token,
+  newPassword: z.string().min(12).max(128)
+    .regex(/[a-z]/).regex(/[A-Z]/).regex(/\d/).regex(/[^A-Za-z0-9]/),
+});
 
 function hashToken(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -121,6 +135,24 @@ export function requestOwnEmailChange(auth: TrustedAuthContext, input: RequestEm
   });
 }
 
+export function changeOwnPassword(auth: TrustedAuthContext, input: ChangeOwnPasswordInput): Promise<void> {
+  return withDomainErrors(async () => {
+    const parsed = changePasswordSchema.parse(input);
+    const passwordHash = await hashPassword(parsed.newPassword);
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findFirst({ where: { id: auth.userId, schoolId: auth.schoolId }, select: { id: true, passwordHash: true } });
+    if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, parsed.currentPassword))) {
+      throw domainError("VALIDATION_ERROR", "The current password is incorrect.");
+    }
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: auth.userId }, data: { passwordHash } });
+      await tx.authSession.updateMany({ where: { userId: auth.userId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.auditLog.create({ data: { schoolId: auth.schoolId, actorUserId: auth.userId, action: "profile.password_changed", entityType: "User", entityId: auth.userId, metadata: {} } });
+    });
+  });
+}
+
 export function confirmOwnEmailChange(input: ConfirmEmailChangeInput): Promise<void> {
   return withDomainErrors(async () => {
     const parsed = z.object({ token }).parse(input);
@@ -134,6 +166,46 @@ export function confirmOwnEmailChange(input: ConfirmEmailChangeInput): Promise<v
       await tx.emailChangeRequest.update({ where: { id: request.id }, data: { consumedAt: now } });
       await tx.authSession.updateMany({ where: { userId: request.userId, revokedAt: null }, data: { revokedAt: now } });
       await tx.auditLog.create({ data: { schoolId: request.schoolId, actorUserId: request.userId, action: "profile.email_changed", entityType: "User", entityId: request.userId, metadata: {} } });
+    });
+  });
+}
+
+export function requestPasswordReset(input: RequestPasswordResetInput): Promise<VerificationRequestResult> {
+  return withDomainErrors(async () => {
+    const parsed = passwordResetRequestSchema.parse(input);
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findUnique({
+      where: { email: parsed.email },
+      select: { id: true, schoolId: true, status: true, school: { select: { isActive: true } } },
+    });
+    const issued = issueToken();
+    if (user?.status === "ACTIVE" && user.school.isActive) {
+      await prisma.passwordResetRequest.create({
+        data: { schoolId: user.schoolId, userId: user.id, tokenHash: issued.hash, expiresAt: issued.expiresAt },
+      });
+    }
+    return verificationResult(user ? issued.value : "", issued.expiresAt);
+  });
+}
+
+export function confirmPasswordReset(input: ConfirmPasswordResetInput): Promise<void> {
+  return withDomainErrors(async () => {
+    const parsed = passwordResetConfirmSchema.parse(input);
+    const passwordHash = await hashPassword(parsed.newPassword);
+    const prisma = getPrismaClient();
+    const request = await prisma.passwordResetRequest.findUnique({
+      where: { tokenHash: hashToken(parsed.token) },
+      include: { user: { select: { status: true } }, school: { select: { isActive: true } } },
+    });
+    if (!request || request.consumedAt || request.expiresAt <= new Date() || request.user.status !== "ACTIVE" || !request.school.isActive) {
+      throw domainError("VALIDATION_ERROR", "The password reset token is invalid or expired.");
+    }
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: request.userId }, data: { passwordHash } });
+      await tx.passwordResetRequest.update({ where: { id: request.id }, data: { consumedAt: now } });
+      await tx.authSession.updateMany({ where: { userId: request.userId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.auditLog.create({ data: { schoolId: request.schoolId, actorUserId: request.userId, action: "profile.password_reset", entityType: "User", entityId: request.userId, metadata: {} } });
     });
   });
 }

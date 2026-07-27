@@ -109,8 +109,27 @@ model School {
   attendanceCorrections AttendanceCorrection[]
   timetableCoverages    TimetableCoverage[]
   emailChangeRequests   EmailChangeRequest[]
+  passwordResetRequests PasswordResetRequest[]
+  holidays              SchoolHoliday[]
 
   @@index([isActive])
+}
+
+model SchoolHoliday {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId    String   @db.Uuid
+  localDate   DateTime @db.Date
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+
+  @@unique([schoolId, localDate])
+  @@index([schoolId, localDate, isActive])
+  @@index([schoolId, isActive])
 }
 
 model AcademicYear {
@@ -181,6 +200,7 @@ model User {
   requestedCoverages        TimetableCoverage[]    @relation("CoverageRequester")
   resolvedCoverages         TimetableCoverage[]    @relation("CoverageResolver")
   emailChangeRequests       EmailChangeRequest[]
+  passwordResetRequests     PasswordResetRequest[]
 
   @@index([schoolId, role, status])
 }
@@ -222,6 +242,22 @@ model EmailChangeRequest {
 
   @@index([schoolId, userId, expiresAt])
   @@index([newEmail, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model PasswordResetRequest {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId   String    @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, expiresAt])
   @@index([expiresAt, consumedAt])
 }
 

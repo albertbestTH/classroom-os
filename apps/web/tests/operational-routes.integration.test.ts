@@ -6,7 +6,8 @@ import { GET as getToday } from "@/app/api/me/today/route";
 import { POST as startSession } from "@/app/api/sessions/[id]/start/route";
 import { GET as getTimeline } from "@/app/api/sessions/[id]/timeline/route";
 import { POST as materialize } from "@/app/api/timetable/[id]/materialize/route";
-import { GET as getTimetable } from "@/app/api/timetable/route";
+import { PATCH as patchTimetable } from "@/app/api/timetable/[id]/route";
+import { GET as getTimetable, POST as postTimetable } from "@/app/api/timetable/route";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 import { createPrismaClient, disconnectPrisma } from "../../../packages/database/src/client.js";
 import type { PrismaClient } from "../../../packages/database/src/generated/prisma/client.js";
@@ -73,5 +74,28 @@ describe("operational timetable routes", () => {
     const response = await materialize(request(`/api/timetable/${tenant.timetableEntry.id}/materialize`, login.token, "POST", { localDate: "not-a-date" }), { params: Promise.resolve({ id: tenant.timetableEntry.id }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+  });
+
+  it("creates repeated assignment slots, persists PATCH updates, and rejects cross-school edits", async () => {
+    const tenant = await createSyntheticTenant(prisma, schoolIds, "api-timetable-edit");
+    const other = await createSyntheticTenant(prisma, schoolIds, "api-timetable-foreign");
+    const password = "Synthetic!Timetable2026";
+    await prisma.user.update({ where: { id: tenant.user.id }, data: { passwordHash: await hashPassword(password) } });
+    const login = await authenticateWithPassword({ email: tenant.user.email, password });
+    const create = (weekday: number, startTime: string, endTime: string) => postTimetable(request("/api/timetable", login.token, "POST", { teachingAssignmentId: tenant.teachingAssignment.id, weekday, startTime, endTime, room: "SYNTHETIC" }));
+    expect((await create(3, "10:30", "11:20")).status).toBe(201);
+    expect((await create(5, "13:00", "13:50")).status).toBe(201);
+    const listed = await getTimetable(request(`/api/timetable?termId=${tenant.term.id}`, login.token));
+    const listPayload = await listed.json() as { data: Array<{ teachingAssignmentId: string }> };
+    expect(listPayload.data.filter((item) => item.teachingAssignmentId === tenant.teachingAssignment.id)).toHaveLength(3);
+
+    const update = await patchTimetable(request(`/api/timetable/${tenant.timetableEntry.id}`, login.token, "PATCH", { weekday: 4, startTime: "12:30", endTime: "13:20" }), { params: Promise.resolve({ id: tenant.timetableEntry.id }) });
+    expect(update.status).toBe(200);
+    await expect(update.json()).resolves.toMatchObject({ data: { id: tenant.timetableEntry.id, weekday: 4, startTime: "12:30", endTime: "13:20" } });
+    await expect(prisma.timetableEntry.findUnique({ where: { id: tenant.timetableEntry.id } })).resolves.toMatchObject({ weekday: 4 });
+
+    const forbidden = await patchTimetable(request(`/api/timetable/${other.timetableEntry.id}`, login.token, "PATCH", { weekday: 2 }), { params: Promise.resolve({ id: other.timetableEntry.id }) });
+    expect(forbidden.status).toBe(403);
+    await expect(forbidden.json()).resolves.toMatchObject({ error: { code: "FORBIDDEN" } });
   });
 });

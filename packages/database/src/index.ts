@@ -13,6 +13,7 @@ export * from "./services/dashboard.service.js";
 export * from "./services/health.service.js";
 export * from "./services/profile.service.js";
 export * from "./services/session.service.js";
+export * from "./services/school-holiday.service.js";
 export * from "./services/student.service.js";
 export * from "./services/subject.service.js";
 export * from "./services/timetable.service.js";

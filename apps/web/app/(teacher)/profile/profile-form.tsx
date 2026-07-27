@@ -41,6 +41,16 @@ export function ProfileForm({ initialUser }: { initialUser: CurrentUserResult })
     catch (error) { setMessage(error instanceof Error ? error.message : "ยืนยันอีเมลไม่สำเร็จ"); }
   }
 
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setMessage("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await mutation("/api/profile/password", { currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword") });
+      setMessage("เปลี่ยนรหัสผ่านแล้ว กรุณาเข้าสู่ระบบอีกครั้ง");
+      window.location.assign("/login");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "ไม่สามารถเปลี่ยนรหัสผ่านได้"); }
+  }
+
   const inputClass = "mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20";
   return <div className="mt-8 grid gap-6 lg:grid-cols-2">
     <form onSubmit={saveProfile} className="space-y-4 rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
@@ -64,5 +74,12 @@ export function ProfileForm({ initialUser }: { initialUser: CurrentUserResult })
       </form>
       {message ? <p aria-live="polite" className="text-sm font-medium text-blue-700">{message}</p> : null}
     </div>
+    <form onSubmit={changePassword} className="space-y-4 rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-sm lg:col-span-2">
+      <h2 className="text-lg font-bold">เปลี่ยนรหัสผ่าน</h2>
+      <p className="text-sm text-slate-600">หลังเปลี่ยนรหัสผ่าน ระบบจะให้ออกจากระบบทุกอุปกรณ์เพื่อความปลอดภัย</p>
+      <label className="block text-sm font-semibold">รหัสผ่านปัจจุบัน<input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required /></label>
+      <label className="block text-sm font-semibold">รหัสผ่านใหม่<input className={inputClass} name="newPassword" type="password" autoComplete="new-password" minLength={12} required /><span className="mt-1 block text-xs font-normal text-slate-500">อย่างน้อย 12 ตัว มีตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก ตัวเลข และสัญลักษณ์</span></label>
+      <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white focus-visible:ring-2 focus-visible:ring-slate-900">เปลี่ยนรหัสผ่านและออกจากระบบทุกอุปกรณ์</button>
+    </form>
   </div>;
 }

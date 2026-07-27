@@ -34,6 +34,7 @@ export function StartClassButton({
       const live = await requestApi<ClassSessionResult>(`/api/sessions/${session.id}/start`, {
         body: { expectedUpdatedAt: session.updatedAt },
       });
+      if (live.status !== "live") throw new Error("Session start was not confirmed by the server.");
       router.push(`/sessions/${live.id}`);
       router.refresh();
     } catch (startError) {

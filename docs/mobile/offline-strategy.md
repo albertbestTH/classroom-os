@@ -9,3 +9,5 @@ The opaque session token and minimal current-user snapshot use device-only secur
 Attendance saves, session lifecycle actions, profile updates, and all other mutations require connectivity. The app never queues or invents server actions. Student rosters and attendance drafts are excluded from persisted query storage to reduce sensitive local data and avoid write conflicts.
 
 The profile query, teaching assignments, classroom list, timetable, coverage requests, and Today response carry independent freshness timestamps. Screens show the oldest relevant timestamp so teachers are not given a misleading impression that a composite view is newer than one of its sources.
+
+Cached operational data remains readable while disconnected. Returning to the foreground does not force a network request while offline; reconnection refreshes the operational query families, and pull-to-refresh remains an explicit recovery path. This hotfix does not add an offline mutation queue, so start/end/save actions still require a canonical server response.

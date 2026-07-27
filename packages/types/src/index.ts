@@ -47,6 +47,11 @@ export interface RequestEmailChangeInput {
   currentPassword: string;
 }
 
+export interface ChangeOwnPasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface VerificationRequestResult {
   expiresAt: string;
   developmentToken?: string;
@@ -54,6 +59,15 @@ export interface VerificationRequestResult {
 
 export interface ConfirmEmailChangeInput {
   token: string;
+}
+
+export interface RequestPasswordResetInput {
+  email: string;
+}
+
+export interface ConfirmPasswordResetInput {
+  token: string;
+  newPassword: string;
 }
 
 export interface SchoolProfileResult {
@@ -232,6 +246,21 @@ export interface UpdateTermInput extends TenantServiceInput {
   isCurrent?: boolean;
 }
 
+export interface CreateSchoolHolidayInput extends TenantServiceInput {
+  localDate: string;
+  name: string;
+  description?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateSchoolHolidayInput extends TenantServiceInput {
+  holidayId: string;
+  localDate?: string;
+  name?: string;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 export const SESSION_STATUSES = [
   "scheduled",
   "live",
@@ -276,6 +305,8 @@ export const DOMAIN_ERROR_CODES = [
   "INVALID_STATE_TRANSITION",
 ] as const;
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
+export type { AttendanceSummary, AttendanceSummaryInput } from "./attendance-summary.js";
+export { formatAttendancePercentage, summarizeAttendance } from "./attendance-summary.js";
 
 export interface TenantServiceInput {
   schoolId: string;
@@ -473,6 +504,17 @@ export interface TermResult {
   updatedAt: string;
 }
 
+export interface SchoolHolidayResult {
+  id: string;
+  schoolId: string;
+  localDate: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TimetableEntryResult {
   id: string;
   schoolId: string;
@@ -625,6 +667,7 @@ export interface TodayTimetableResult {
   timezone: string;
   currentAcademicYear: AcademicYearResult | null;
   currentTerm: TermResult | null;
+  holiday: SchoolHolidayResult | null;
   classes: TodayClassResult[];
   nextClass: TodayClassResult | null;
   completedCount: number;
