@@ -13,7 +13,7 @@ import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
-import { developmentEnvironmentLabel } from "@/lib/environment";
+import { developmentEnvironmentLabel, getApiBaseUrl } from "@/lib/environment";
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <View style={styles.detail}><ThemedText tone="muted" style={styles.label}>{label}</ThemedText><ThemedText style={styles.value}>{value}</ThemedText></View>;
@@ -34,6 +34,10 @@ export default function ProfileScreen() {
   const [profileMessage, setProfileMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const environment = developmentEnvironmentLabel();
+  const profileImageUri = (() => {
+    if (!current?.profileImageKey) return null;
+    try { return `${getApiBaseUrl()}${current.profileImageKey}`; } catch { return null; }
+  })();
 
   async function saveProfile() {
     setSaving(true); setProfileMessage("");
@@ -48,7 +52,7 @@ export default function ProfileScreen() {
   return <SafeScreen>
     <OfflineBanner visible={!isOnline} lastUpdated={updatedTimes.length ? Math.min(...updatedTimes) : undefined} />
     <AppHeader title="โปรไฟล์" subtitle="ข้อมูลบัญชีครูที่กำลังใช้งาน" />
-    <Card><View style={styles.identity}><Avatar label={`${current?.firstName ?? ""} ${current?.lastName ?? ""}`} size={56} /><View style={styles.identityText}><ThemedText style={styles.name}>{current?.firstName} {current?.lastName}</ThemedText><ThemedText tone="muted" style={styles.email}>{current?.email ?? "-"}</ThemedText></View><StatusBadge label="ครูผู้สอน" tone="success" /></View></Card>
+    <Card><View style={styles.identity}><Avatar label={`${current?.firstName ?? ""} ${current?.lastName ?? ""}`} imageUri={profileImageUri} size={56} /><View style={styles.identityText}><ThemedText style={styles.name}>{current?.firstName} {current?.lastName}</ThemedText><ThemedText tone="muted" style={styles.email}>{current?.email ?? "-"}</ThemedText></View><StatusBadge label="ครูผู้สอน" tone="success" /></View></Card>
     <SectionHeader title="บริบทปัจจุบัน" />
     <Card><Detail label="โรงเรียน" value={current?.schoolName ?? "-"} /><Detail label="รหัสบุคลากร" value={current?.employeeCode ?? "ยังไม่ระบุ"} /><Detail label="ปีการศึกษา" value={today.data?.currentAcademicYear?.name ?? "ยังไม่กำหนด"} /><Detail label="ภาคเรียน" value={today.data?.currentTerm?.name ?? "ยังไม่กำหนด"} /></Card>
     <SectionHeader title="งานสอนของฉัน" action={<StatusBadge label={`${assignments.data?.length ?? current?.assignmentCount ?? 0} รายการ`} />}/>

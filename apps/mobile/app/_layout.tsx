@@ -1,4 +1,5 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,5 +16,10 @@ function ThemedApp() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    LINESeedSansTH: require("../assets/fonts/LINESeedSansTH-Regular.ttf"),
+    LINESeedSansTHBold: require("../assets/fonts/LINESeedSansTH-Bold.ttf"),
+  });
+  if (!fontsLoaded) return null;
   return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><ThemeProvider><PersistQueryClientProvider client={queryClient} persistOptions={persistedQueryOptions}><ThemedApp /></PersistQueryClientProvider></ThemeProvider></SafeAreaProvider></GestureHandlerRootView>;
 }
