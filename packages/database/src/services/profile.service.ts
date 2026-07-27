@@ -93,9 +93,20 @@ async function currentUser(userId: string, schoolId: string): Promise<CurrentUse
     userId: user.id, schoolId: user.schoolId, role: user.role, workspaceType: user.school.workspaceType,
     teacherId: user.teacherProfile?.id ?? null, email: user.email,
     firstName: user.firstName, lastName: user.lastName, phoneNumber: user.phoneNumber,
+    profileImageKey: user.profileImageKey,
     schoolName: user.school.name, employeeCode: user.teacherProfile?.employeeCode ?? null,
     assignmentCount: user.teacherProfile?._count.teachingAssignments ?? 0,
   };
+}
+
+export function updateOwnProfileImage(auth: TrustedAuthContext, profileImageKey: string | null): Promise<CurrentUserResult> {
+  return withDomainErrors(async () => {
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findFirst({ where: { id: auth.userId, schoolId: auth.schoolId }, select: { id: true } });
+    if (!user) throw domainError("NOT_FOUND", "The account was not found for this school.");
+    await prisma.user.update({ where: { id: user.id }, data: { profileImageKey } });
+    return currentUser(auth.userId, auth.schoolId);
+  });
 }
 
 export function getOwnProfile(auth: TrustedAuthContext): Promise<CurrentUserResult> {

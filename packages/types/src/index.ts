@@ -29,6 +29,7 @@ export interface CurrentUserResult extends TrustedAuthContext {
   firstName: string;
   lastName: string;
   phoneNumber: string | null;
+  profileImageKey: string | null;
   schoolName: string;
   employeeCode: string | null;
   assignmentCount: number;

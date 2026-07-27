@@ -175,18 +175,20 @@ model Term {
 }
 
 model User {
-  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId     String        @db.Uuid
-  email        String        @unique
-  firstName    String
-  lastName     String
-  phoneNumber  String?
-  role         UserRole
-  status       AccountStatus @default(ACTIVE)
-  passwordHash String?
-  lastLoginAt  DateTime?     @db.Timestamptz(3)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId        String        @db.Uuid
+  email           String        @unique
+  firstName       String
+  lastName        String
+  phoneNumber     String?
+  /// Private object-storage key for a display-only profile image. Never biometric data.
+  profileImageKey String?
+  role            UserRole
+  status          AccountStatus @default(ACTIVE)
+  passwordHash    String?
+  lastLoginAt     DateTime?     @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
 
   school                    School                 @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   teacherProfile            Teacher?               @relation("TeacherUser")
