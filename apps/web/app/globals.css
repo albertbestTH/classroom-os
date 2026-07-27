@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "LINE Seed Sans TH";
+  src: url("/fonts/LINESeedSansTH-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LINE Seed Sans TH";
+  src: url("/fonts/LINESeedSansTH-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+}
+
 :root {
   --background: #f7f8fa;
   --foreground: #111827;
@@ -8,8 +24,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-sans: "LINE Seed Sans TH", "Noto Sans Thai", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * {
@@ -24,7 +40,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  font-family: "LINE Seed Sans TH", "Noto Sans Thai", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 button,
@@ -35,4 +51,40 @@ input {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+.teacher-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.72fr) minmax(340px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.teacher-dashboard-left-column,
+.teacher-dashboard-right-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (max-width: 1279px) {
+  .teacher-dashboard-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .teacher-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teacher-dashboard-left-column,
+  .teacher-dashboard-right-column { display: contents; }
+  .teacher-dashboard-hero { order: 1; }
+  .teacher-dashboard-actions { order: 2; }
+  .teacher-dashboard-attendance { order: 3; }
+  .teacher-dashboard-schedule { order: 4; }
+  .teacher-dashboard-pending { order: 5; }
+  .teacher-dashboard-trends { order: 6; }
 }

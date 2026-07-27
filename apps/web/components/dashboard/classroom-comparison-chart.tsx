@@ -1,45 +1,8 @@
 "use client";
 
 import type { DashboardClassroomComparison } from "@classroom-os/types";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export function ClassroomComparisonChart({ classrooms }: { classrooms: DashboardClassroomComparison[] }) {
-  if (classrooms.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-300 px-5 py-12 text-center" role="status">
-        <p className="font-semibold">ยังไม่มีข้อมูลเปรียบเทียบชั้นเรียน</p>
-        <p className="mt-1 text-sm text-[#6B7280]">แต่ละชั้นและวิชาจะแสดงแยกกันเมื่อมีข้อมูล</p>
-      </div>
-    );
-  }
-  const data = classrooms.map((item) => ({
-    ...item,
-    label: `${item.classroomName} · ${item.subjectName}`,
-    percentage: item.attendancePercentage,
-  }));
-  return (
-    <figure aria-label="เปรียบเทียบอัตราการเข้าเรียนแยกตามชั้นเรียนและวิชา">
-      <div style={{ height: Math.max(220, data.length * 54) }} aria-hidden="true">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 18, left: 4, bottom: 4 }}>
-            <CartesianGrid stroke="#E5E7EB" strokeDasharray="4 4" horizontal={false} />
-            <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#4B5563", fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis type="category" dataKey="label" width={145} tick={{ fill: "#374151", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <Tooltip formatter={(value, _, item) => [`${value ?? "–"}% · ${item.payload.attendedCount}/${item.payload.eligibleCount} รายการ`, "อัตราการเข้าเรียน"]} />
-            <Bar dataKey="percentage" fill="#2563EB" radius={[0, 6, 6, 0]} maxBarSize={22} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <figcaption>
-        <ul className="mt-3 space-y-2 text-sm">
-          {classrooms.map((item) => (
-            <li key={`${item.classroomId}:${item.subjectId}`} className="flex flex-col justify-between gap-1 rounded-lg bg-slate-50 px-3 py-2 sm:flex-row">
-              <span><strong>{item.classroomName}</strong> · {item.subjectName}</span>
-              <span className="text-[#4B5563]">{item.attendancePercentage === null ? "ยังไม่มีข้อมูล" : `${item.attendancePercentage}% (${item.attendedCount}/${item.eligibleCount})`}</span>
-            </li>
-          ))}
-        </ul>
-      </figcaption>
-    </figure>
-  );
+  if (classrooms.length === 0) return <div className="rounded-xl border border-dashed border-slate-300 px-5 py-10 text-center" role="status"><p className="font-semibold">ยังไม่มีข้อมูลห้องเรียน</p><p className="mt-1 text-sm text-slate-500">จะแสดงแนวโน้มเมื่อมีข้อมูลการเข้าเรียนย้อนหลัง</p></div>;
+  return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="แนวโน้มการเข้าเรียนรายห้องเรียน">{classrooms.slice(0, 4).map((item) => <article key={`${item.classroomId}:${item.subjectId}`} className="rounded-xl bg-white p-3 shadow-[0_4px_14px_rgba(15,23,42,.05)]"><div className="flex items-start justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">{item.classroomName}</h3><p className="mt-1 text-xs text-slate-500">{item.eligibleCount} นักเรียน</p></div><strong className="text-base text-emerald-600">{item.attendancePercentage === null ? "—" : `${item.attendancePercentage}%`}</strong></div><div className="mt-4 flex h-10 items-end gap-1" aria-hidden="true">{[0, 1, 2, 3, 4].map((point) => <span key={point} className="h-1 w-full rounded-full bg-slate-200" />)}</div><p className="mt-2 text-[11px] text-slate-400">ยังไม่มีประวัติรายวัน</p></article>)}</div>;
 }

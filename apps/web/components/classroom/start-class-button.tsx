@@ -10,10 +10,12 @@ export function StartClassButton({
   item,
   localDate,
   compact = false,
+  inverse = false,
 }: {
   item: TodayClassResult;
   localDate: string;
   compact?: boolean;
+  inverse?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -50,7 +52,7 @@ export function StartClassButton({
         type="button"
         onClick={startOrResume}
         disabled={pending || item.status === "completed" || item.status === "missed"}
-        className={`${compact ? "min-h-11 px-4 py-2 text-sm" : "min-h-14 w-full px-6 py-3 text-base"} rounded-xl bg-blue-600 font-bold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300`}
+        className={`${compact ? "min-h-11 px-4 py-2 text-sm" : "min-h-14 w-full px-6 py-3 text-base"} rounded-xl ${inverse ? "bg-white text-[#123D9A] hover:bg-blue-50 focus-visible:ring-white" : "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-600"} font-bold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300`}
       >
         {pending ? "กำลังเริ่มคาบ…" : item.session?.status === "live" ? "กลับเข้าสู่คาบเรียน" : "เริ่มคาบเรียน"}
       </button>

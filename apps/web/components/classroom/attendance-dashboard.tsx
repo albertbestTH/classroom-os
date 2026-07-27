@@ -1,11 +1,11 @@
 import { formatAttendancePercentage, type AttendanceSummary } from "@classroom-os/types";
 
 const statusConfig = [
-  { key: "present", percentageKey: "presentPercentage", label: "มา", color: "#15803D", classes: "text-emerald-700" },
-  { key: "late", percentageKey: "latePercentage", label: "สาย", color: "#B45309", classes: "text-amber-800" },
-  { key: "leave", percentageKey: "leavePercentage", label: "ลา", color: "#2563EB", classes: "text-blue-700" },
-  { key: "absent", percentageKey: "absentPercentage", label: "ขาด", color: "#B91C1C", classes: "text-red-700" },
-  { key: "unrecorded", percentageKey: "unrecordedPercentage", label: "ยังไม่บันทึก", color: "#6B7280", classes: "text-slate-700" },
+  { key: "present", percentageKey: "presentPercentage", label: "มา", color: "#16B67A", classes: "text-emerald-700" },
+  { key: "late", percentageKey: "latePercentage", label: "สาย", color: "#F59E0B", classes: "text-amber-700" },
+  { key: "leave", percentageKey: "leavePercentage", label: "ลา", color: "#94A3B8", classes: "text-slate-600" },
+  { key: "absent", percentageKey: "absentPercentage", label: "ขาด", color: "#F04D45", classes: "text-red-700" },
+  { key: "unrecorded", percentageKey: "unrecordedPercentage", label: "ยังไม่บันทึก", color: "#94A3B8", classes: "text-slate-600" },
 ] as const;
 
 export function AttendanceDashboard({ summary }: { summary: AttendanceSummary }) {
