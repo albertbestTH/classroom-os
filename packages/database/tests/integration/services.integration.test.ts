@@ -9,9 +9,11 @@ import {
   createTimetableEntry,
   endClassSession,
   getStudent,
+  listStudents,
   startClassSession,
   updateAttendanceBatch,
   updateScoreBatch,
+  updateStudent,
   type DomainError,
 } from "../../src/index.js";
 import { createPrismaClient, disconnectPrisma } from "../../src/client.js";
@@ -57,6 +59,55 @@ describe("tenant application services", () => {
     await expect(
       getStudent({ schoolId: "", studentId: tenantA.student.id }),
     ).rejects.toSatisfy((error) => expectDomainCode(error, "TENANT_ACCESS_DENIED"));
+  });
+
+  it("assigns, lists, and updates classroom-scoped student roll numbers", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "student-roll-number");
+    const first = await createStudent({
+      schoolId: tenant.school.id,
+      studentNumber: `ROLL-A-${randomUUID().slice(0, 8)}`,
+      firstName: "Synthetic",
+      lastName: "First Learner",
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+    });
+    const second = await createStudent({
+      schoolId: tenant.school.id,
+      studentNumber: `ROLL-B-${randomUUID().slice(0, 8)}`,
+      firstName: "Synthetic",
+      lastName: "Second Learner",
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+    });
+
+    const createdRoster = await listStudents({
+      schoolId: tenant.school.id,
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+    });
+    expect(createdRoster.find((student) => student.id === first.id)?.rollNumber).toBe(1);
+    expect(createdRoster.find((student) => student.id === second.id)?.rollNumber).toBe(2);
+
+    await updateStudent({
+      schoolId: tenant.school.id,
+      studentId: second.id,
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+      rollNumber: 9,
+    });
+    const updatedRoster = await listStudents({
+      schoolId: tenant.school.id,
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+    });
+    expect(updatedRoster.find((student) => student.id === second.id)?.rollNumber).toBe(9);
+    await expect(updateStudent({
+      schoolId: tenant.school.id,
+      studentId: second.id,
+      classroomId: tenant.classroom.id,
+      termId: tenant.term.id,
+      rollNumber: 1,
+    })).rejects.toSatisfy((error) => expectDomainCode(error, "CONFLICT"));
   });
 
   it("enforces scheduled to live to completed session transitions", async () => {

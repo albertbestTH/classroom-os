@@ -32,11 +32,13 @@ export type ListStudentsInput = TenantScope & {
   take?: number;
 };
 
+export type StudentRosterRecord = Student & { rollNumber: number | null };
+
 export type UpdateStudentInput = TenantScope & {
   studentId: string;
   data: Pick<
     Prisma.StudentUpdateManyMutationInput,
-    "firstName" | "lastName" | "preferredName" | "dateOfBirth" | "isActive"
+    "studentNumber" | "firstName" | "lastName" | "preferredName" | "dateOfBirth" | "isActive"
   >;
 };
 
@@ -70,12 +72,12 @@ export async function createStudentForSchool(
 export async function listStudentsForSchool(
   client: StudentClient,
   input: ListStudentsInput,
-): Promise<Student[]> {
+): Promise<StudentRosterRecord[]> {
   const schoolId = requireSchoolId(input);
   const query = input.query?.trim();
   const take = Math.min(Math.max(input.take ?? 100, 1), 200);
 
-  return client.student.findMany({
+  const students = await client.student.findMany({
     where: {
       schoolId,
       ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
@@ -103,8 +105,25 @@ export async function listStudentsForSchool(
         : {}),
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+    include: {
+      classEnrollments: {
+        where: {
+          schoolId,
+          ...(input.classroomId ? { classroomId: input.classroomId } : {}),
+          ...(input.termId ? { termId: input.termId } : {}),
+          isActive: true,
+        },
+        select: { rollNumber: true },
+        take: 1,
+      },
+    },
     take,
   });
+
+  return students.map(({ classEnrollments, ...student }) => ({
+    ...student,
+    rollNumber: input.classroomId ? classEnrollments[0]?.rollNumber ?? null : null,
+  }));
 }
 
 export async function requireStudentForSchool(

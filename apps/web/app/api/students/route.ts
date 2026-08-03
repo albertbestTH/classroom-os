@@ -11,6 +11,7 @@ import { NextRequest } from "next/server";
 import {
   optionalBoolean,
   optionalNullableString,
+  optionalNumber,
   requiredString,
   withAuthenticatedApi,
 } from "@/lib/api";
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       query: request.nextUrl.searchParams.get("query") ?? undefined,
       classroomId,
       termId,
-      isActive: request.nextUrl.searchParams.get("isActive") === "false" ? false : true,
+      isActive: request.nextUrl.searchParams.get("isActive") === "all" ? undefined : request.nextUrl.searchParams.get("isActive") === "false" ? false : true,
     });
   });
 }
@@ -45,7 +46,15 @@ export async function POST(request: NextRequest) {
     request,
     { mutation: true, json: true },
     async ({ context }, body = {}) => {
-      requireRole(context, ["SCHOOL_OWNER", "ADMIN"]);
+      requireRole(context, ["SCHOOL_OWNER", "ADMIN", "TEACHER"]);
+      const classroomId = typeof body.classroomId === "string" ? body.classroomId : undefined;
+      const termId = typeof body.termId === "string" ? body.termId : undefined;
+      if (context.role === "TEACHER") {
+        if (!classroomId || !termId) {
+          throw domainError("VALIDATION_ERROR", "กรุณาเลือกห้องเรียนและภาคเรียน");
+        }
+        await requireClassroomAccess(context, { classroomId, termId });
+      }
       return createStudent(
         trustedTenantInput(context, {
           studentNumber: requiredString(body, "studentNumber"),
@@ -54,6 +63,9 @@ export async function POST(request: NextRequest) {
           preferredName: optionalNullableString(body, "preferredName"),
           dateOfBirth: optionalNullableString(body, "dateOfBirth"),
           isActive: optionalBoolean(body, "isActive"),
+          classroomId,
+          termId,
+          rollNumber: optionalNumber(body, "rollNumber"),
         }),
       );
     },

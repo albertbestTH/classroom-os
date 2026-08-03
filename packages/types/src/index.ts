@@ -321,15 +321,22 @@ export interface CreateStudentInput extends TenantServiceInput {
   preferredName?: string | null;
   dateOfBirth?: string | null;
   isActive?: boolean;
+  classroomId?: string;
+  termId?: string;
+  rollNumber?: number | null;
 }
 
 export interface UpdateStudentInput extends TenantServiceInput {
   studentId: string;
+  studentNumber?: string;
   firstName?: string;
   lastName?: string;
   preferredName?: string | null;
   dateOfBirth?: string | null;
   isActive?: boolean;
+  classroomId?: string;
+  termId?: string;
+  rollNumber?: number | null;
 }
 
 export interface CreateClassroomInput extends TenantServiceInput {
@@ -456,6 +463,7 @@ export interface StudentResult {
   profileImageKey: string | null;
   dateOfBirth: string | null;
   isActive: boolean;
+  rollNumber: number | null;
 }
 
 export interface ClassroomResult {

@@ -398,6 +398,7 @@ model ClassEnrollment {
   termId      String    @db.Uuid
   classroomId String    @db.Uuid
   studentId   String    @db.Uuid
+  rollNumber  Int?
   enrolledAt  DateTime  @default(now()) @db.Timestamptz(3)
   leftAt      DateTime? @db.Timestamptz(3)
   isActive    Boolean   @default(true)
@@ -410,6 +411,7 @@ model ClassEnrollment {
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
   @@unique([termId, classroomId, studentId])
+  @@unique([schoolId, termId, classroomId, rollNumber])
   @@index([schoolId, termId, classroomId, isActive])
   @@index([schoolId, termId, studentId])
 }

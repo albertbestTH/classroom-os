@@ -93,6 +93,34 @@ describe("service validation schemas", () => {
     ).toThrow();
   });
 
+  it("validates classroom-scoped student roll numbers", () => {
+    const classroomId = randomUUID();
+    const termId = randomUUID();
+    expect(createStudentSchema.parse({
+      schoolId,
+      studentNumber: "SYN-ROLL-01",
+      firstName: "Synthetic",
+      lastName: "Learner",
+      classroomId,
+      termId,
+      rollNumber: 7,
+    }).rollNumber).toBe(7);
+    expect(() => createStudentSchema.parse({
+      schoolId,
+      studentNumber: "SYN-ROLL-02",
+      firstName: "Synthetic",
+      lastName: "Learner",
+      rollNumber: 1,
+    })).toThrow();
+    expect(() => updateStudentSchema.parse({
+      schoolId,
+      studentId,
+      classroomId,
+      termId,
+      rollNumber: 0,
+    })).toThrow();
+  });
+
   it("requires valid timestamps for session start and end", () => {
     expect(() =>
       startClassSessionSchema.parse({

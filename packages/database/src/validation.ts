@@ -33,21 +33,40 @@ export const createStudentSchema = z.object({
   preferredName: nullableTrimmedText,
   dateOfBirth: isoDate.nullable().optional(),
   isActive: z.boolean().optional(),
-});
+  classroomId: uuid("classroomId").optional(),
+  termId: uuid("termId").optional(),
+  rollNumber: z.number().int().positive().nullable().optional(),
+}).refine(
+  ({ classroomId, termId }) => Boolean(classroomId) === Boolean(termId),
+  { message: "classroomId and termId must be provided together.", path: ["classroomId"] },
+).refine(
+  ({ classroomId, termId, rollNumber }) =>
+    rollNumber === undefined || rollNumber === null || (Boolean(classroomId) && Boolean(termId)),
+  { message: "classroomId and termId are required when rollNumber is provided.", path: ["rollNumber"] },
+);
 
 export const updateStudentSchema = z
   .object({
     ...tenantFields,
     studentId: uuid("studentId"),
+    studentNumber: trimmedText("studentNumber").optional(),
     firstName: trimmedText("firstName").optional(),
     lastName: trimmedText("lastName").optional(),
     preferredName: nullableTrimmedText,
     dateOfBirth: isoDate.nullable().optional(),
     isActive: z.boolean().optional(),
+    classroomId: uuid("classroomId").optional(),
+    termId: uuid("termId").optional(),
+    rollNumber: z.number().int().positive().nullable().optional(),
   })
   .refine(
-    ({ firstName, lastName, preferredName, dateOfBirth, isActive }) =>
-      [firstName, lastName, preferredName, dateOfBirth, isActive].some(
+    ({ classroomId, termId, rollNumber }) =>
+      rollNumber === undefined || (Boolean(classroomId) && Boolean(termId)),
+    { message: "classroomId and termId are required when rollNumber is updated.", path: ["rollNumber"] },
+  )
+  .refine(
+    ({ studentNumber, firstName, lastName, preferredName, dateOfBirth, isActive, rollNumber }) =>
+      [studentNumber, firstName, lastName, preferredName, dateOfBirth, isActive, rollNumber].some(
         (value) => value !== undefined,
       ),
     { message: "At least one student field must be updated." },

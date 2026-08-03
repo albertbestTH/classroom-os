@@ -58,6 +58,7 @@ export function toStudentResult(student: Student): StudentResult {
     profileImageKey: student.profileImageKey,
     dateOfBirth: student.dateOfBirth?.toISOString().slice(0, 10) ?? null,
     isActive: student.isActive,
+    rollNumber: null,
   };
 }
 
