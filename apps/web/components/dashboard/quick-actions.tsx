@@ -24,11 +24,11 @@ type Props = { attendanceClass?: TodayClassResult | null };
 export function QuickActions({ attendanceClass = null }: Props) {
   const attendance = getAttendanceActionState(attendanceClass);
   const actions = [
-    { href: attendance.href, label: attendance.title, hint: attendance.caption, Icon: attendance.icon, tone: attendance.tone },
-    { href: "/timetable", label: "ตารางสอน", hint: "ดูคาบเรียนทั้งหมด", Icon: CalendarDays, tone: "bg-blue-50 text-blue-600" },
-    { href: "/reports", label: "ดูรายงาน", hint: "สรุปผลการเรียน", Icon: BarChart3, tone: "bg-violet-50 text-violet-600" },
-    { href: "/classrooms", label: "ชั้นเรียน", hint: "จัดการห้องเรียน", Icon: Users, tone: "bg-orange-50 text-orange-600" },
+    { href: attendance.href, label: attendance.title, Icon: attendance.icon, tone: attendance.tone },
+    { href: "/timetable", label: "ตารางสอน", Icon: CalendarDays, tone: "bg-blue-50 text-blue-600" },
+    { href: "/classrooms", label: "ชั้นเรียน", Icon: Users, tone: "bg-orange-50 text-orange-600" },
+    { href: "/reports", label: "ดูรายงาน", Icon: BarChart3, tone: "bg-violet-50 text-violet-600" },
   ];
 
-  return <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="ทางลัดการทำงาน">{actions.map(({ href, label, hint, Icon, tone }) => <Link key={`${href}:${label}`} href={href} className="group flex min-h-24 flex-col justify-between rounded-xl bg-slate-50/80 p-4 shadow-[0_4px_12px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"><span className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon size={20} strokeWidth={2} aria-hidden="true" /></span><span><span className="block text-sm font-bold text-slate-900">{label}</span><span className="mt-0.5 block text-xs text-slate-500">{hint}</span></span></Link>)}</div>;
+  return <div className="grid grid-cols-4 gap-1.5 sm:gap-2" aria-label="ทางลัดการทำงาน">{actions.map(({ href, label, Icon, tone }) => <Link key={`${href}:${label}`} href={href} className="group flex min-h-[88px] min-w-0 flex-col items-center justify-start gap-2 rounded-xl px-1 py-2 text-center transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:-translate-y-0.5 ${tone}`}><Icon size={20} strokeWidth={2} aria-hidden="true" /></span><span className="block whitespace-nowrap text-[11px] font-bold leading-5 text-slate-900 sm:text-xs">{label}</span></Link>)}</div>;
 }

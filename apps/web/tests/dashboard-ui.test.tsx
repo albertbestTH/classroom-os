@@ -10,7 +10,7 @@ import { AttendanceTrendChart } from "@/components/dashboard/attendance-trend-ch
 import { ClassroomComparisonChart } from "@/components/dashboard/classroom-comparison-chart";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { SessionStatusChart } from "@/components/dashboard/session-status-chart";
-import { getAttendanceActionState } from "@/components/dashboard/quick-actions";
+import { getAttendanceActionState, QuickActions } from "@/components/dashboard/quick-actions";
 import type { TodayClassResult } from "@classroom-os/types";
 
 const attendanceClass = (recorded: number, enrolled: number) => ({
@@ -44,6 +44,13 @@ describe("dashboard visualization states", () => {
     expect(getAttendanceActionState(attendanceClass(12, 30))).toMatchObject({ title: "เช็กชื่อต่อ", caption: "เช็กแล้ว 12/30 คน", state: "partial" });
     expect(getAttendanceActionState(attendanceClass(30, 30))).toMatchObject({ title: "เช็กชื่อแล้ว", caption: "ครบ 30/30 คน", state: "complete", href: "/sessions/session-1" });
     expect(getAttendanceActionState(null)).toMatchObject({ title: "เช็กชื่อ", caption: "ดูรายการคาบเรียน", state: "empty", href: "/timetable" });
+  });
+
+  it("renders quick actions as one compact four-item row", () => {
+    const actions = renderToStaticMarkup(<QuickActions attendanceClass={attendanceClass(0, 30)} />);
+    expect(actions).toContain("grid-cols-4");
+    expect((actions.match(/<a /g) ?? []).length).toBe(4);
+    expect(actions).not.toContain("ดูคาบเรียนทั้งหมด");
   });
 
   it("renders loading, error/retry, and action link semantics", () => {

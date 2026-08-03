@@ -28,7 +28,7 @@ describe("operational classroom states", () => {
       completedCount: 0,
       missedCount: 0,
     }} />);
-    expect(markup).toContain("วันนี้ไม่มีคาบเรียน");
+    expect(markup).toContain("วันนี้ไม่มีคาบสอน");
     expect(markup).not.toContain("mock");
   });
 });

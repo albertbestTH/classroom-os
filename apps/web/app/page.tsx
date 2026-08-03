@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { TodaySchedule } from "@/components/classroom/today-schedule";
 import { ActionRequiredList } from "@/components/dashboard/action-required-list";
 import { AttendanceDonutChart } from "@/components/dashboard/attendance-donut-chart";
+import { AttendanceScopeSelect } from "@/components/dashboard/attendance-scope-select";
 import { AttendanceTrendChart } from "@/components/dashboard/attendance-trend-chart";
 import { ClassroomComparisonChart } from "@/components/dashboard/classroom-comparison-chart";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
@@ -38,6 +39,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     auth: user.workspaceType === "PERSONAL" ? { ...context, role: "TEACHER" as const } : context,
     filters: dashboardFiltersFromSearchParams(toUrlSearchParams(query)),
   });
+  const trendsOverview = overview.filters.classroomId
+    ? await getDashboardOverview({
+      schoolId: context.schoolId,
+      auth: user.workspaceType === "PERSONAL" ? { ...context, role: "TEACHER" as const } : context,
+      filters: { days: overview.days },
+    })
+    : overview;
   const isTeacher = context.role === "TEACHER" || user.workspaceType === "PERSONAL";
   const dateLabel = new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeZone: overview.timezone }).format(new Date());
 
@@ -66,11 +74,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div className="teacher-dashboard-left-column">
             <div className="teacher-dashboard-hero"><NextClassCard nextClass={overview.nextClass} liveSession={overview.liveSession} localDate={overview.localDate} /></div>
             <div className="teacher-dashboard-schedule"><TodaySchedule today={overview.today} /></div>
-            <div className="teacher-dashboard-trends"><DashboardCard title="ห้องเรียนและแนวโน้มการเข้าเรียน" description="ข้อมูลจากชั้นเรียนที่คุณรับผิดชอบ"><ClassroomComparisonChart classrooms={overview.classrooms} /></DashboardCard></div>
+            <div className="teacher-dashboard-trends"><DashboardCard title="ห้องเรียนและแนวโน้มการเข้าเรียน" description="ข้อมูลจากชั้นเรียนที่คุณรับผิดชอบ"><ClassroomComparisonChart classrooms={trendsOverview.classrooms} /></DashboardCard></div>
           </div>
           <div className="teacher-dashboard-right-column">
-            <div className="teacher-dashboard-actions"><DashboardCard title="ทางลัด" description="ทางลัดสำหรับงานที่ทำบ่อย"><QuickActions attendanceClass={overview.liveSession ?? overview.nextClass} /></DashboardCard></div>
-            <div className="teacher-dashboard-attendance"><DashboardCard title="ภาพรวมการเข้าเรียนวันนี้" description="สถานะการเข้าเรียนวันนี้"><AttendanceDonutChart {...overview.attendance} /></DashboardCard></div>
+            <div className="teacher-dashboard-actions"><DashboardCard title="ทางลัด"><QuickActions attendanceClass={overview.liveSession ?? overview.nextClass} /></DashboardCard></div>
+            <div className="teacher-dashboard-attendance"><DashboardCard title="ภาพรวมการเข้าเรียนวันนี้" description="สถานะการเข้าเรียนวันนี้" headerAction={<AttendanceScopeSelect options={overview.filterOptions.classrooms} value={overview.filters.classroomId} />}><AttendanceDonutChart {...overview.attendance} /></DashboardCard></div>
             <div className="teacher-dashboard-pending"><DashboardCard title="งานที่ต้องติดตาม" description="รายการที่ควรติดตามต่อ"><ActionRequiredList actions={overview.actions.slice(0, 5)} /></DashboardCard></div>
           </div>
         </div>
