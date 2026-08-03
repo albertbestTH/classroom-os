@@ -42,3 +42,9 @@ When testing score entry, tap both the visible score field and its surrounding t
 On Windows, CMake used by `react-native-worklets` can exceed the legacy path limit when the repository has a long absolute path. Keep the checkout path short or use a local short pnpm virtual store before building, for example `pnpm install --force --virtual-store-dir C:\.cos-pnpm`. This path is machine-local and must not be committed. For an x86_64 Android Studio emulator, a generated native project can be validated with `gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64`; normal EAS builds create all configured production architectures remotely.
 
 After installing a development build and preparing a synthetic teacher account, install Maestro and run `pnpm --filter mobile e2e:android` with `MAESTRO_TEST_EMAIL` and `MAESTRO_TEST_PASSWORD`. The smoke test clears application state and never uses real student data.
+
+### Native Android source strategy
+
+`apps/mobile/android/` is the tracked native Android project used for development-client and Gradle builds. Gradle files, manifests, Kotlin sources, XML resources, and wrapper files are source and must remain reviewable. Build caches and outputs (`.gradle/`, `build/`, `app/build/`, APK/AAB files, signing artifacts, and `local.properties`) are machine-local and must not be committed.
+
+Because the native project is tracked, Expo app-config fields such as orientation, scheme, plugins, and Android package metadata are not automatically synchronized into the existing native folder. Treat the Android project as authoritative for native builds; review any app.json change against the native files before running prebuild or EAS. Expo Doctor may report this managed/native configuration boundary until the project is intentionally migrated to one strategy.
