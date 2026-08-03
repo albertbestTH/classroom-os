@@ -1,0 +1,73 @@
+name: Staging gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "apps/web/**"
+      - "packages/database/**"
+      - "packages/types/**"
+      - "packages/design-tokens/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-staging-bound:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: classroom_os
+          POSTGRES_USER: classroom
+          POSTGRES_PASSWORD: classroom_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U classroom -d classroom_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://classroom:classroom_ci_only@localhost:5432/classroom_os?schema=public
+      AUTH_LOGIN_RATE_LIMIT_MAX: "5"
+      AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: "900000"
+      AUTH_LOGIN_RATE_LIMIT_MAX_BUCKETS: "10000"
+      EXPO_PUBLIC_API_BASE_URL: https://staging.example.invalid
+      EXPO_PUBLIC_ENV_LABEL: UAT
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Enable pnpm through Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm db:migrate:deploy
+      - run: pnpm db:test
+      - run: pnpm api:test
+      - run: pnpm --filter mobile test
+      - run: pnpm --filter mobile typecheck
+      - run: pnpm --filter mobile build
+      - name: Validate Expo config
+        run: pnpm --filter mobile exec expo config --type public
+      - run: pnpm lint
+      - run: pnpm build
+      - run: git diff --check

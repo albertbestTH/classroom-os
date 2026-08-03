@@ -152,6 +152,7 @@ From the repository root, `pnpm api:test` builds shared packages and runs route-
 ## CI database lifecycle
 
 GitHub Actions starts a fresh PostgreSQL 16 service for each job and supplies a CI-only `DATABASE_URL`. CI runs `prisma migrate deploy` against that empty service, executes synthetic tests, then discards the service automatically. CI never runs `prisma migrate dev`, creates migration files, or touches the local named volume.
+For external UAT, use a separate managed PostgreSQL database and `prisma migrate deploy`. The guarded scripts `scripts/seed-uat.ts`, `scripts/verify-uat.ts`, and `scripts/reset-uat.ts` require `CLASSROOM_OS_ENV=staging`, `UAT_SEED_CONFIRM=CLASSROOM-OS-UAT`, a non-local `DATABASE_URL`, and runtime-only passwords. They create or remove only the synthetic `UAT-CLASSROOM-OS` tenant and print safe identifiers only.
 
 ## Local data reset
 

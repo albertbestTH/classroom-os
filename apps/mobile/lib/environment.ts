@@ -8,6 +8,8 @@ export function getApiBaseUrl(): string {
 }
 
 export function developmentEnvironmentLabel(): string | null {
+  const configuredLabel = process.env.EXPO_PUBLIC_ENV_LABEL?.trim();
+  if (configuredLabel) return configuredLabel;
   if (!__DEV__) return null;
   try { return new URL(getApiBaseUrl()).host; } catch { return "ยังไม่ตั้งค่า API"; }
 }

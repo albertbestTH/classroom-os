@@ -115,6 +115,7 @@ Materialization, start/end, timetable changes, and attendance changes are audite
 After login, all roles redirect to `/`; the server renders the personal Teacher Workspace for `TEACHER` and the school overview for `SCHOOL_OWNER` or `ADMIN`. Role-specific page layouts and every API handler repeat their authorization checks, so navigation visibility and post-login routing are never security controls.
 
 ## Native teacher authentication
+`GET /api/health` is a public, no-store readiness probe that returns only `{ status, database }` and a request ID header. Hosted UAT must run migrations before traffic, use a separate database, and keep reset/seed operations outside public HTTP routes.
 
 The mobile login route accepts the same validated email/password input as web login but permits only active `TEACHER` accounts. It returns the one-time raw opaque session token and expiry; the database retains only its SHA-256 hash. Native requests send the token as `Authorization: Bearer <token>`. Session validation and logout require a well-formed bearer token, and logout revokes it server-side. Cookie behavior is unchanged for web clients.
 

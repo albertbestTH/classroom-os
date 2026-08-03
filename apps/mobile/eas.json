@@ -6,12 +6,18 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ENV_LABEL": "DEV"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ENV_LABEL": "UAT"
+      },
       "android": {
         "buildType": "apk"
       }

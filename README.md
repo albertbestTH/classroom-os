@@ -45,6 +45,7 @@ The web gradebook and mobile quick-score workflow use the same tenant-scoped ass
 Android development builds use `pnpm --filter mobile android:dev-build`; EAS development/preview APK profiles live in `apps/mobile/eas.json`. The Maestro smoke flow is `pnpm --filter mobile e2e:android` and requires synthetic `MAESTRO_TEST_EMAIL` and `MAESTRO_TEST_PASSWORD` values.
 
 Production readiness gates, privacy limits, health monitoring, and backup/restore expectations are documented in [production readiness](docs/operations/production-readiness.md). The repository is not approved for real student data yet.
+External teacher UAT uses the separate HTTPS/Web, managed PostgreSQL, and internal Android flow documented in [staging architecture](docs/deployment/staging-architecture.md), [staging runbook](docs/deployment/staging-runbook.md), and the Thai [teacher guide](docs/uat/teacher-uat-guide-th.md). Use synthetic records only; the guarded seed refuses local databases and never stores passwords.
 
 To deliberately reset the disposable local database, first stop Compose and remove its volume, then recreate and migrate it:
 
