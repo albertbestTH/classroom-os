@@ -7,3 +7,14 @@ packages/types/dist
 apps/mobile/.env
 apps/mobile/.expo
 apps/mobile/dist
+
+# Local runtime uploads and generated validation artifacts
+apps/web/public/uploads/
+coverage/
+build/
+*.log
+teacher-dashboard-*.png
+*.apk
+*.aab
+*.keystore
+local.properties
