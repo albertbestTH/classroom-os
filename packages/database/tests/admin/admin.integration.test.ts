@@ -4,8 +4,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createAcademicYear,
+  createClassroom,
   createSubject,
   createTerm,
+  deleteClassroom,
+  deleteSubject,
   getClassroom,
   getSubject,
   listAcademicYears,
@@ -39,6 +42,32 @@ describe("admin catalog and academic calendar services", () => {
     const updated = await updateSubject({ schoolId: tenantA.school.id, actorUserId: tenantA.user.id, subjectId: subject.id, name: "Synthetic subject updated" });
     expect(updated.name).toBe("Synthetic subject updated");
     await expect(prisma.auditLog.count({ where: { schoolId: tenantA.school.id, entityId: subject.id } })).resolves.toBe(2);
+  });
+
+  it("deletes only unused classroom and subject records and writes audit logs", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "admin-delete");
+    const classroom = await createClassroom({
+      schoolId: tenant.school.id,
+      actorUserId: tenant.user.id,
+      code: `DELETE-${randomUUID()}`,
+      name: "Synthetic unused classroom",
+      gradeLevel: "TEST",
+    });
+    const subject = await createSubject({
+      schoolId: tenant.school.id,
+      actorUserId: tenant.user.id,
+      code: `DELETE-${randomUUID()}`,
+      name: "Synthetic unused subject",
+    });
+
+    await expect(deleteClassroom({ schoolId: tenant.school.id, actorUserId: tenant.user.id, classroomId: classroom.id })).resolves.toMatchObject({ id: classroom.id });
+    await expect(deleteSubject({ schoolId: tenant.school.id, actorUserId: tenant.user.id, subjectId: subject.id })).resolves.toMatchObject({ id: subject.id });
+    await expect(getClassroom({ schoolId: tenant.school.id, classroomId: classroom.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(getSubject({ schoolId: tenant.school.id, subjectId: subject.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(prisma.auditLog.count({ where: { schoolId: tenant.school.id, action: { in: ["classroom.deleted", "subject.deleted"] } } })).resolves.toBe(2);
+
+    await expect(deleteClassroom({ schoolId: tenant.school.id, classroomId: tenant.classroom.id })).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(deleteSubject({ schoolId: tenant.school.id, subjectId: tenant.subject.id })).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("maintains one current year and term and validates date ranges", async () => {

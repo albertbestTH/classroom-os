@@ -5,11 +5,11 @@ import { NextRequest } from "next/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { GET as getAcademicYears, POST as postAcademicYear } from "@/app/api/academic-years/route";
-import { PATCH as patchClassroom } from "@/app/api/classrooms/[id]/route";
+import { DELETE as deleteClassroom, PATCH as patchClassroom } from "@/app/api/classrooms/[id]/route";
 import { POST as postClassroom } from "@/app/api/classrooms/route";
 import { PATCH as patchStaffStatus } from "@/app/api/staff/[id]/status/route";
 import { GET as getStaff, POST as postStaff } from "@/app/api/staff/route";
-import { PATCH as patchSubject } from "@/app/api/subjects/[id]/route";
+import { DELETE as deleteSubject, PATCH as patchSubject } from "@/app/api/subjects/[id]/route";
 import { GET as getSubjects, POST as postSubject } from "@/app/api/subjects/route";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 import { createPrismaClient, disconnectPrisma } from "../../../packages/database/src/client.js";
@@ -73,6 +73,19 @@ describe("admin console API routes", () => {
 
     expect((await patchSubject(request(`/api/subjects/${other.subject.id}`, { token: adminToken, method: "PATCH", json: { name: "Cross tenant" } }), { params: Promise.resolve({ id: other.subject.id }) })).status).toBe(404);
     expect((await patchClassroom(request(`/api/classrooms/${other.classroom.id}`, { token: adminToken, method: "PATCH", json: { name: "Cross tenant" } }), { params: Promise.resolve({ id: other.classroom.id }) })).status).toBe(404);
+    expect((await deleteSubject(request(`/api/subjects/${other.subject.id}`, { token: adminToken, method: "DELETE" }), { params: Promise.resolve({ id: other.subject.id }) })).status).toBe(404);
+    expect((await deleteClassroom(request(`/api/classrooms/${other.classroom.id}`, { token: adminToken, method: "DELETE" }), { params: Promise.resolve({ id: other.classroom.id }) })).status).toBe(404);
+  });
+
+  it("allows administrators to delete unused classroom and subject records", async () => {
+    const { adminToken } = await setupManagers();
+    const subjectResponse = await postSubject(request("/api/subjects", { token: adminToken, method: "POST", json: { code: `DEL-${randomUUID()}`, name: "Synthetic deletable subject" } }));
+    const classroomResponse = await postClassroom(request("/api/classrooms", { token: adminToken, method: "POST", json: { code: `DEL-${randomUUID()}`, name: "Synthetic deletable classroom", gradeLevel: "TEST" } }));
+    const subject = await subjectResponse.json() as { data: { id: string } };
+    const classroom = await classroomResponse.json() as { data: { id: string } };
+
+    expect((await deleteSubject(request(`/api/subjects/${subject.data.id}`, { token: adminToken, method: "DELETE" }), { params: Promise.resolve({ id: subject.data.id }) })).status).toBe(200);
+    expect((await deleteClassroom(request(`/api/classrooms/${classroom.data.id}`, { token: adminToken, method: "DELETE" }), { params: Promise.resolve({ id: classroom.data.id }) })).status).toBe(200);
   });
 
   it("revokes a staff session through the disable-account route", async () => {

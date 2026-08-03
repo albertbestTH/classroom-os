@@ -115,3 +115,17 @@ export async function updateClassroomForSchool(
     rethrowScopedMutationError(error, "Classroom");
   }
 }
+
+export async function deleteClassroomForSchool(
+  client: ClassroomClient,
+  input: TenantScope & { classroomId: string },
+): Promise<Classroom> {
+  const schoolId = requireSchoolId(input);
+  const classroomId = requireRecordId(input.classroomId, "classroomId");
+
+  try {
+    return await client.classroom.delete({ where: { id: classroomId, schoolId } });
+  } catch (error) {
+    rethrowScopedMutationError(error, "Classroom");
+  }
+}

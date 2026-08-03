@@ -10,6 +10,7 @@ import { getPrismaClient } from "../client.js";
 import { createAuditLogForSchool } from "../repositories/audit.repository.js";
 import {
   createSubjectForSchool,
+  deleteSubjectForSchool,
   listSubjectsForSchool,
   requireSubjectForSchool,
   updateSubjectForSchool,
@@ -100,6 +101,27 @@ export function updateSubject(input: UpdateSubjectInput): Promise<SubjectResult>
         entityType: "Subject",
         entityId: subject.id,
         metadata: { fields: Object.keys(data) },
+      });
+      return toSubjectResult(subject);
+    });
+  });
+}
+
+export function deleteSubject(
+  input: TenantServiceInput & { subjectId: string },
+): Promise<SubjectResult> {
+  return executeTenantService(input, async () => {
+    const parsed = z.object({ ...tenantFields, subjectId: z.string().uuid() }).parse(input);
+    return getPrismaClient().$transaction(async (transaction) => {
+      await requireSubjectForSchool(transaction, parsed);
+      const subject = await deleteSubjectForSchool(transaction, parsed);
+      await createAuditLogForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        actorUserId: parsed.actorUserId,
+        action: "subject.deleted",
+        entityType: "Subject",
+        entityId: subject.id,
+        metadata: { code: subject.code },
       });
       return toSubjectResult(subject);
     });

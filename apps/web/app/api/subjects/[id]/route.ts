@@ -1,4 +1,4 @@
-import { requireRole, trustedTenantInput, updateSubject } from "@classroom-os/database";
+import { deleteSubject, requireRole, trustedTenantInput, updateSubject } from "@classroom-os/database";
 import { NextRequest } from "next/server";
 
 import { optionalBoolean, optionalString, withAuthenticatedApi } from "@/lib/api";
@@ -22,4 +22,12 @@ export async function PATCH(request: NextRequest, route: SubjectRouteContext) {
       );
     },
   );
+}
+
+export async function DELETE(request: NextRequest, route: SubjectRouteContext) {
+  return withAuthenticatedApi(request, { mutation: true }, async ({ context }) => {
+    requireRole(context, ["SCHOOL_OWNER", "ADMIN"]);
+    const { id } = await route.params;
+    return deleteSubject(trustedTenantInput(context, { subjectId: id }));
+  });
 }

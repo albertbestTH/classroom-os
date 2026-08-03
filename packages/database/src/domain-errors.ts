@@ -59,7 +59,7 @@ export function mapToDomainError(error: unknown): DomainError {
 
   if (
     error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
+    (error.code === "P2002" || error.code === "P2003")
   ) {
     return domainError("CONFLICT", "The requested record conflicts with existing data.");
   }

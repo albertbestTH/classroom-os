@@ -64,3 +64,16 @@ export async function updateSubjectForSchool(
     rethrowScopedMutationError(error, "Subject");
   }
 }
+
+export async function deleteSubjectForSchool(
+  client: SubjectClient,
+  input: TenantScope & { subjectId: string },
+): Promise<Subject> {
+  const schoolId = requireSchoolId(input);
+  const subjectId = requireRecordId(input.subjectId, "subjectId");
+  try {
+    return await client.subject.delete({ where: { id: subjectId, schoolId } });
+  } catch (error) {
+    rethrowScopedMutationError(error, "Subject");
+  }
+}

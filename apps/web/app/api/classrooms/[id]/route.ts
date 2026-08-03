@@ -1,4 +1,5 @@
 import {
+  deleteClassroom,
   getClassroom,
   requireClassroomAccess,
   requireRole,
@@ -16,6 +17,14 @@ export async function GET(request: NextRequest, route: ClassroomRouteContext) {
     const { id } = await route.params;
     await requireClassroomAccess(context, { classroomId: id });
     return getClassroom({ schoolId: context.schoolId, classroomId: id });
+  });
+}
+
+export async function DELETE(request: NextRequest, route: ClassroomRouteContext) {
+  return withAuthenticatedApi(request, { mutation: true }, async ({ context }) => {
+    requireRole(context, ["SCHOOL_OWNER", "ADMIN"]);
+    const { id } = await route.params;
+    return deleteClassroom(trustedTenantInput(context, { classroomId: id }));
   });
 }
 

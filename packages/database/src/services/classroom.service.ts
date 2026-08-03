@@ -10,6 +10,7 @@ import { getPrismaClient } from "../client.js";
 import { createAuditLogForSchool } from "../repositories/audit.repository.js";
 import {
   createClassroomForSchool,
+  deleteClassroomForSchool,
   listClassroomsForSchool,
   requireClassroomForSchool,
   updateClassroomForSchool,
@@ -97,5 +98,26 @@ export function listClassrooms(
   return executeTenantService(input, async () => {
     const classrooms = await listClassroomsForSchool(getPrismaClient(), input);
     return classrooms.map(toClassroomResult);
+  });
+}
+
+export function deleteClassroom(
+  input: TenantServiceInput & { classroomId: string },
+): Promise<ClassroomResult> {
+  return executeTenantService(input, async () => {
+    const parsed = classroomIdSchema.parse(input);
+    return getPrismaClient().$transaction(async (transaction) => {
+      await requireClassroomForSchool(transaction, parsed);
+      const classroom = await deleteClassroomForSchool(transaction, parsed);
+      await createAuditLogForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        actorUserId: input.actorUserId,
+        action: "classroom.deleted",
+        entityType: "Classroom",
+        entityId: classroom.id,
+        metadata: { code: classroom.code },
+      });
+      return toClassroomResult(classroom);
+    });
   });
 }
