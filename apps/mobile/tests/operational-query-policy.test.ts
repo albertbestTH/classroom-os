@@ -3,6 +3,7 @@ import { createAppFocusHandler, OPERATIONAL_STALE_TIME, queryPolicyForKey, STABL
 describe("operational query freshness", () => {
   it("uses short freshness only for operational roots", () => {
     expect(queryPolicyForKey(["today"]).staleTime).toBe(OPERATIONAL_STALE_TIME);
+    expect(queryPolicyForKey(["dashboard", "classroom-id"]).staleTime).toBe(OPERATIONAL_STALE_TIME);
     expect(queryPolicyForKey(["session", "id"]).refetchOnReconnect).toBe("always");
     expect(queryPolicyForKey(["profile"]).staleTime).toBe(STABLE_STALE_TIME);
   });

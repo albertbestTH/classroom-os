@@ -40,18 +40,19 @@ describe("attendance report and correction routes", () => {
 
   it("returns tenant-scoped reports, safe CSV, and manager-only corrections", async () => {
     const tenant = await createSyntheticTenant(prisma, schoolIds, "api-attendance-report");
+    await prisma.term.update({ where: { id: tenant.term.id }, data: { endsOn: new Date("2099-12-31T00:00:00.000Z") } });
     const password = "Synthetic!Attendance2026";
     await prisma.user.update({ where: { id: tenant.user.id }, data: { passwordHash: await hashPassword(password) } });
     const admin = await prisma.user.create({ data: { schoolId: tenant.school.id, email: `admin+${tenant.school.id}@example.invalid`, firstName: "Synthetic", lastName: "Admin", role: "ADMIN", passwordHash: await hashPassword(password) } });
     await prisma.classEnrollment.create({ data: { schoolId: tenant.school.id, termId: tenant.term.id, classroomId: tenant.classroom.id, studentId: tenant.student.id } });
-    const session = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: tenant.timetableEntry.id, localDate: "2026-07-20" });
-    await startClassSession({ schoolId: tenant.school.id, sessionId: session.id });
+    const session = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: tenant.timetableEntry.id, localDate: "2099-07-20" });
+    await startClassSession({ schoolId: tenant.school.id, sessionId: session.id, startedAt: session.scheduledStart });
     await updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: session.id, records: [{ studentId: tenant.student.id, status: "present" }] });
-    await endClassSession({ schoolId: tenant.school.id, sessionId: session.id });
+    await endClassSession({ schoolId: tenant.school.id, sessionId: session.id, endedAt: session.scheduledEnd });
     const record = await prisma.attendanceRecord.findUniqueOrThrow({ where: { classSessionId_studentId: { classSessionId: session.id, studentId: tenant.student.id } } });
     const teacherLogin = await authenticateWithPassword({ email: tenant.user.email, password });
     const adminLogin = await authenticateWithPassword({ email: admin.email, password });
-    const query = `termId=${tenant.term.id}&from=2026-07-20&to=2026-07-20`;
+    const query = `termId=${tenant.term.id}&from=2099-07-20&to=2099-07-20`;
 
     const report = await getReport(request(`/api/reports/attendance?${query}`, teacherLogin.token));
     expect(report.status).toBe(200);

@@ -5,7 +5,9 @@ import SessionError from "@/app/sessions/[id]/error";
 import SessionLoading from "@/app/sessions/[id]/loading";
 import TimetableError from "@/app/timetable/error";
 import TimetableLoading from "@/app/timetable/loading";
-import { TodaySchedule } from "@/components/classroom/today-schedule";
+import type { TodayClassResult } from "@classroom-os/types";
+
+import { sortTodayClassesByStartTime, TodaySchedule } from "@/components/classroom/today-schedule";
 
 describe("operational classroom states", () => {
   it("renders Thai loading and keyboard-accessible retry states", () => {
@@ -30,5 +32,19 @@ describe("operational classroom states", () => {
     }} />);
     expect(markup).toContain("วันนี้ไม่มีคาบสอน");
     expect(markup).not.toContain("mock");
+  });
+
+  it("orders dashboard periods by their changed start time", () => {
+    const classes = [
+      { scheduledStart: "2026-07-15T07:00:00.000Z", timetableEntry: { id: "period-3" } },
+      { scheduledStart: "2026-07-15T01:00:00.000Z", timetableEntry: { id: "period-1" } },
+      { scheduledStart: "2026-07-15T03:00:00.000Z", timetableEntry: { id: "period-2" } },
+    ] as TodayClassResult[];
+    expect(sortTodayClassesByStartTime(classes).map((item) => item.timetableEntry.id)).toEqual([
+      "period-1",
+      "period-2",
+      "period-3",
+    ]);
+    expect(classes[0]?.timetableEntry.id).toBe("period-3");
   });
 });

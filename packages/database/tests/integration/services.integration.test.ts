@@ -10,6 +10,7 @@ import {
   endClassSession,
   getStudent,
   listStudents,
+  reconcileExpiredClassSessions,
   startClassSession,
   updateAttendanceBatch,
   updateScoreBatch,
@@ -128,19 +129,19 @@ describe("tenant application services", () => {
     });
     expect(live.status).toBe("live");
     await expect(
-      startClassSession({ schoolId: tenant.school.id, sessionId: session.id }),
-    ).resolves.toMatchObject({ id: session.id, status: "live" });
+      startClassSession({ schoolId: tenant.school.id, sessionId: session.id, startedAt: "2026-08-03T01:02:00.000Z" }),
+    ).rejects.toSatisfy((error) => expectDomainCode(error, "INVALID_STATE_TRANSITION"));
 
     const completed = await endClassSession({
       schoolId: tenant.school.id,
       actorUserId: tenant.user.id,
       sessionId: session.id,
-      endedAt: "2026-08-03T01:45:00.000Z",
+      endedAt: "2026-08-03T01:20:00.000Z",
     });
     expect(completed.status).toBe("completed");
     await expect(
-      endClassSession({ schoolId: tenant.school.id, sessionId: session.id }),
-    ).resolves.toMatchObject({ id: session.id, status: "completed" });
+      endClassSession({ schoolId: tenant.school.id, sessionId: session.id, endedAt: "2026-08-03T01:51:00.000Z" }),
+    ).rejects.toSatisfy((error) => expectDomainCode(error, "INVALID_STATE_TRANSITION"));
   });
 
   it("allows attendance only for enrolled students and blocks completed edits", async () => {
@@ -171,11 +172,40 @@ describe("tenant application services", () => {
     });
     expect((await updateAttendanceBatch(input)).count).toBe(1);
 
-    await startClassSession({ schoolId: tenant.school.id, sessionId: session.id });
-    await endClassSession({ schoolId: tenant.school.id, sessionId: session.id });
+    await startClassSession({ schoolId: tenant.school.id, sessionId: session.id, startedAt: "2026-08-10T01:00:00.000Z" });
+    await endClassSession({ schoolId: tenant.school.id, sessionId: session.id, endedAt: "2026-08-10T01:50:00.000Z" });
     await expect(updateAttendanceBatch(input)).rejects.toSatisfy((error) =>
       expectDomainCode(error, "INVALID_STATE_TRANSITION"),
     );
+  });
+
+  it("automatically completes live sessions after their scheduled end", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "auto-end");
+    const session = await createClassSession({
+      schoolId: tenant.school.id,
+      timetableEntryId: tenant.timetableEntry.id,
+      scheduledStart: "2026-08-17T01:00:00.000Z",
+      scheduledEnd: "2026-08-17T01:50:00.000Z",
+    });
+    await startClassSession({
+      schoolId: tenant.school.id,
+      sessionId: session.id,
+      startedAt: "2026-08-17T01:00:00.000Z",
+    });
+
+    await expect(reconcileExpiredClassSessions({
+      schoolId: tenant.school.id,
+      observedAt: new Date("2026-08-17T01:50:00.000Z"),
+    })).resolves.toBe(1);
+    await expect(reconcileExpiredClassSessions({
+      schoolId: tenant.school.id,
+      observedAt: new Date("2026-08-17T01:51:00.000Z"),
+    })).resolves.toBe(0);
+    await expect(prisma.classSession.findUniqueOrThrow({ where: { id: session.id } })).resolves.toMatchObject({
+      status: "completed",
+      endedAt: new Date("2026-08-17T01:50:00.000Z"),
+    });
+    await expect(prisma.auditLog.findFirstOrThrow({ where: { schoolId: tenant.school.id, entityId: session.id, action: "session.auto_ended" } })).resolves.toMatchObject({ actorUserId: null });
   });
 
   it("enforces score enrollment and assessment maximums", async () => {

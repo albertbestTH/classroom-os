@@ -65,6 +65,7 @@ describe("operational classroom workflow", () => {
 
   it("enforces roster isolation, live overlap, timeline events, and completed read-only state", async () => {
     const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "live-isolation");
+    await prisma.term.update({ where: { id: tenant.term.id }, data: { endsOn: new Date("2099-12-31T00:00:00.000Z") } });
     await prisma.classEnrollment.create({
       data: { schoolId: tenant.school.id, termId: tenant.term.id, classroomId: tenant.classroom.id, studentId: tenant.student.id },
     });
@@ -89,8 +90,8 @@ describe("operational classroom workflow", () => {
         classroomId: classB.id,
         subjectId: tenant.subject.id,
         weekday: 1,
-        startTime: new Date("1970-01-01T09:00:00.000Z"),
-        endTime: new Date("1970-01-01T09:50:00.000Z"),
+        startTime: new Date("1970-01-01T08:30:00.000Z"),
+        endTime: new Date("1970-01-01T09:20:00.000Z"),
       },
     });
     const entries = await listTimetableEntries({
@@ -105,18 +106,18 @@ describe("operational classroom workflow", () => {
     expect(new Set(entries.map((entry) => entry.teachingAssignmentId))).toEqual(
       new Set([tenant.teachingAssignment.id, assignmentB.id]),
     );
-    const sessionA = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: tenant.timetableEntry.id, localDate: "2026-07-20" });
-    const sessionB = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: timetableB.id, localDate: "2026-07-20" });
-    await startClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id });
-    await expect(startClassSession({ schoolId: tenant.school.id, sessionId: sessionB.id })).rejects.toSatisfy((error) => hasCode(error, "CONFLICT"));
+    const sessionA = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: tenant.timetableEntry.id, localDate: "2099-07-20" });
+    const sessionB = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: timetableB.id, localDate: "2099-07-20" });
+    await startClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, startedAt: "2099-07-20T01:00:00.000Z" });
+    await expect(startClassSession({ schoolId: tenant.school.id, sessionId: sessionB.id, startedAt: "2099-07-20T01:30:00.000Z" })).rejects.toSatisfy((error) => hasCode(error, "CONFLICT"));
     await expect(updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: sessionA.id, records: [{ studentId: studentB.id, status: "present" }] })).rejects.toSatisfy((error) => hasCode(error, "VALIDATION_ERROR"));
     await updateAttendanceBatch({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "present" }] });
     const roster = await getSessionAttendanceRoster({ schoolId: tenant.school.id, sessionId: sessionA.id });
     expect(roster.students.map((student) => student.studentId)).toEqual([tenant.student.id]);
-    const completed = await endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id });
+    const completed = await endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, endedAt: "2099-07-20T01:20:00.000Z" });
     expect(completed.status).toBe("completed");
     expect((await getClassSession({ schoolId: tenant.school.id, sessionId: sessionA.id })).status).toBe("completed");
-    await expect(endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id })).resolves.toMatchObject({ status: "completed" });
+    await expect(endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, endedAt: "2099-07-20T01:21:00.000Z" })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
     await expect(updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "late" }] })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
     expect((await listClassSessionTimeline({ schoolId: tenant.school.id, sessionId: sessionA.id })).map((event) => event.eventType)).toEqual(["SESSION_STARTED", "ATTENDANCE_UPDATED", "SESSION_ENDED"]);
   });

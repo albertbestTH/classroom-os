@@ -19,7 +19,6 @@ export async function POST(request: NextRequest, route: SessionRouteContext) {
       return startClassSession(
         trustedTenantInput(context, {
           sessionId: id,
-          startedAt: optionalString(body, "startedAt"),
           expectedUpdatedAt: optionalString(body, "expectedUpdatedAt"),
         }),
       );

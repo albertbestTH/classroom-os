@@ -59,6 +59,17 @@ describe("operational timetable routes", () => {
     const duplicate = await materialize(request(`/api/timetable/${tenant.timetableEntry.id}/materialize`, login.token, "POST", { localDate }), route);
     expect(duplicate.status).toBe(201);
     await expect(duplicate.json()).resolves.toMatchObject({ data: { id: payload.data.id } });
+    const early = await startSession(request(`/api/sessions/${payload.data.id}/start`, login.token, "POST", { startedAt: "2099-01-01T00:00:00.000Z" }), { params: Promise.resolve({ id: payload.data.id }) });
+    expect(early.status).toBe(409);
+    await expect(early.json()).resolves.toMatchObject({ error: { code: "INVALID_STATE_TRANSITION" } });
+    const routeNow = new Date();
+    await prisma.classSession.update({
+      where: { id: payload.data.id },
+      data: {
+        scheduledStart: new Date(routeNow.getTime() - 60_000),
+        scheduledEnd: new Date(routeNow.getTime() + 30 * 60_000),
+      },
+    });
     const live = await startSession(request(`/api/sessions/${payload.data.id}/start`, login.token, "POST", {}), { params: Promise.resolve({ id: payload.data.id }) });
     expect(live.status).toBe(200);
     await expect(live.json()).resolves.toMatchObject({ data: { status: "live", classroomId: tenant.classroom.id } });

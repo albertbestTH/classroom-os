@@ -25,6 +25,7 @@ describe("dashboard analytics", () => {
 
   it("separates assigned classrooms, excludes foreign scopes, and preserves no-session days", async () => {
     const tenant = await createSyntheticTenant(prisma, schoolIds, "dashboard");
+    await prisma.term.update({ where: { id: tenant.term.id }, data: { endsOn: new Date("2099-12-31T00:00:00.000Z") } });
     const studentA = tenant.student;
     const studentB = await prisma.student.create({ data: { schoolId: tenant.school.id, studentNumber: `B-${randomUUID()}`, firstName: "Synthetic", lastName: "Repeated absence" } });
     const classroomB = await prisma.classroom.create({ data: { schoolId: tenant.school.id, code: `B-${randomUUID()}`, name: "Synthetic Classroom B", gradeLevel: "TEST-5" } });
@@ -46,18 +47,18 @@ describe("dashboard analytics", () => {
 
     async function complete(timetableEntryId: string, localDate: string, studentId: string, status: "present" | "absent") {
       const session = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId, localDate });
-      await startClassSession({ schoolId: tenant.school.id, sessionId: session.id });
+      await startClassSession({ schoolId: tenant.school.id, sessionId: session.id, startedAt: session.scheduledStart });
       await updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: session.id, records: [{ studentId, status }] });
-      await endClassSession({ schoolId: tenant.school.id, sessionId: session.id });
+      await endClassSession({ schoolId: tenant.school.id, sessionId: session.id, endedAt: session.scheduledEnd });
       return session;
     }
-    await complete(tenant.timetableEntry.id, "2026-07-20", studentA.id, "present");
-    await complete(timetableBFriday.id, "2026-07-17", studentB.id, "absent");
-    await complete(timetableB.id, "2026-07-20", studentB.id, "absent");
-    await complete(timetableC.id, "2026-07-20", studentC.id, "present");
+    await complete(tenant.timetableEntry.id, "2099-07-20", studentA.id, "present");
+    await complete(timetableBFriday.id, "2099-07-17", studentB.id, "absent");
+    await complete(timetableB.id, "2099-07-20", studentB.id, "absent");
+    await complete(timetableC.id, "2099-07-20", studentC.id, "present");
 
     const teacherAuth: TrustedAuthContext = { userId: tenant.user.id, schoolId: tenant.school.id, role: "TEACHER", teacherId: tenant.teacher.id };
-    const now = new Date("2026-07-20T12:00:00.000Z");
+    const now = new Date("2099-07-20T12:00:00.000Z");
     const teacher = await getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, now });
     expect(teacher.scope).toBe("TEACHER");
     expect(teacher.viewerRole).toBe("TEACHER");
@@ -74,10 +75,41 @@ describe("dashboard analytics", () => {
     expect(teacher.classrooms.find(({ classroomId }) => classroomId === classroomB.id)?.attendancePercentage).toBe(0);
     expect(new Set(teacher.classrooms.map(({ subjectId }) => subjectId))).toEqual(new Set([tenant.subject.id]));
     expect(teacher.repeatedAbsences).toEqual([expect.objectContaining({ studentId: studentB.id, classroomId: classroomB.id, absenceCount: 2 })]);
-    expect(teacher.trend.find(({ date }) => date === "2026-07-15")).toMatchObject({ percentage: null, hasSessions: false });
-    expect(teacher.trend.find(({ date }) => date === "2026-07-20")).toMatchObject({ attendedCount: 1, eligibleCount: 2, percentage: 50 });
-    const timezoneBoundary = await getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, now: new Date("2026-07-19T18:00:00.000Z") });
-    expect(timezoneBoundary.localDate).toBe("2026-07-20");
+    expect(teacher.trend.find(({ date }) => date === "2099-07-15")).toMatchObject({ percentage: null, hasSessions: false });
+    expect(teacher.trend.find(({ date }) => date === "2099-07-20")).toMatchObject({ attendedCount: 1, eligibleCount: 2, percentage: 50 });
+    const timezoneBoundary = await getDashboardOverview({ schoolId: tenant.school.id, auth: teacherAuth, now: new Date("2099-07-19T18:00:00.000Z") });
+    expect(timezoneBoundary.localDate).toBe("2099-07-20");
+
+    const laterTimetable = await prisma.timetableEntry.create({ data: {
+      schoolId: tenant.school.id,
+      termId: tenant.term.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      teacherId: tenant.teacher.id,
+      classroomId: tenant.classroom.id,
+      subjectId: tenant.subject.id,
+      weekday: 1,
+      startTime: new Date("1970-01-01T11:00:00.000Z"),
+      endTime: new Date("1970-01-01T11:50:00.000Z"),
+    } });
+    const unrecordedSession = await materializeClassSession({ schoolId: tenant.school.id, timetableEntryId: laterTimetable.id, localDate: "2099-07-20" });
+    await startClassSession({ schoolId: tenant.school.id, sessionId: unrecordedSession.id, startedAt: unrecordedSession.scheduledStart });
+    await endClassSession({ schoolId: tenant.school.id, sessionId: unrecordedSession.id, endedAt: unrecordedSession.scheduledEnd });
+    const classroomFiltered = await getDashboardOverview({
+      schoolId: tenant.school.id,
+      auth: teacherAuth,
+      filters: { classroomId: tenant.classroom.id },
+      now,
+    });
+    expect(classroomFiltered.attendance).toMatchObject({
+      eligibleCount: 1,
+      recordedCount: 1,
+      completionPercentage: 100,
+      totals: { present: 1, late: 0, absent: 0, leave: 0, unrecorded: 0 },
+    });
+    expect(classroomFiltered.actions).toContainEqual(expect.objectContaining({
+      type: "INCOMPLETE_ATTENDANCE",
+      classroomId: tenant.classroom.id,
+    }));
 
     const admin = await prisma.user.create({ data: { schoolId: tenant.school.id, email: `admin+${randomUUID()}@example.invalid`, firstName: "Synthetic", lastName: "Admin", role: "ADMIN" } });
     const manager = await getDashboardOverview({ schoolId: tenant.school.id, auth: { userId: admin.id, schoolId: tenant.school.id, role: "ADMIN", teacherId: null }, filters: { days: 30 }, now });

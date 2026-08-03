@@ -17,6 +17,6 @@ describe("teacher navigation and refresh regressions", () => {
 
   it("keeps offline mutations disabled in attendance and live session", () => {
     expect(source("features/attendance/attendance-screen.tsx")).toContain("!isOnline || save.isPending");
-    expect(source("features/sessions/session-screen.tsx")).toContain("disabled={!isOnline}");
+    expect(source("features/sessions/session-screen.tsx")).toContain("disabled={!isOnline || end.isPending}");
   });
 });

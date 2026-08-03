@@ -1,13 +1,26 @@
-import type { ClassSessionResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
+import type {
+  ClassSessionResult,
+  DashboardOverviewResult,
+  TodayClassResult,
+  TodayTimetableResult,
+} from "@classroom-os/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useMemo } from "react";
-import { RefreshControl, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { RefreshControl } from "react-native";
 
-import { SessionCard } from "@/components/classroom/session-card";
-import { AppButton, AppHeader, Card, EmptyState, ErrorState, MetricCard, OfflineBanner, ProgressBar, SafeScreen, SectionHeader, SkeletonCard, StatusBadge, ThemedText, Timeline, TimelineItem } from "@/components/ui/primitives";
+import {
+  Card,
+  ErrorState,
+  OfflineBanner,
+  SafeScreen,
+  SkeletonCard,
+  StatusBadge,
+  ThemedText,
+} from "@/components/ui/primitives";
 import { spacing } from "@/constants/tokens";
 import { useAuth } from "@/features/auth/auth-context";
+import { canStartScheduledSession } from "@/features/sessions/session-time";
 import { useTheme } from "@/features/theme/theme-context";
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-query";
 import { useNetworkStatus } from "@/hooks/use-network-status";
@@ -15,78 +28,122 @@ import { apiRequest } from "@/lib/api-client";
 import { thaiErrorMessage } from "@/lib/api-error";
 import { invalidateSessionWorkflow, queryKeys } from "@/lib/query-keys";
 
-import { groupTodayClasses, timelineStatus } from "./today-presentation";
-
-const statusLabels = { scheduled: "รอเริ่ม", live: "กำลังสอน", completed: "เสร็จแล้ว", cancelled: "ยกเลิก", missed: "เลยเวลา" } as const;
-
-function formatRange(item: TodayClassResult): string {
-  const formatter = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
-  return `${formatter.format(new Date(item.scheduledStart))}–${formatter.format(new Date(item.scheduledEnd))} น.`;
-}
+import { TodayDashboard } from "./today-dashboard";
 
 export function TodayScreen() {
   const { user, token } = useAuth();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const [now, setNow] = useState(() => Date.now());
   const today = useAuthenticatedQuery<TodayTimetableResult>(queryKeys.today, "/api/me/today");
-  const groups = useMemo(() => groupTodayClasses(today.data?.classes ?? []), [today.data?.classes]);
+
+  const focusClassroomId = useMemo(() => {
+    const classes = today.data?.classes ?? [];
+    const focus = classes.find((item) => item.status === "live")
+      ?? classes.find((item) => item.status === "scheduled")
+      ?? classes.findLast((item) => item.status === "completed");
+    return focus?.timetableEntry.classroomId;
+  }, [today.data?.classes]);
+
+  const dashboardPath = focusClassroomId
+    ? `/api/dashboard/overview?classroomId=${encodeURIComponent(focusClassroomId)}`
+    : "/api/dashboard/overview";
+  const dashboard = useAuthenticatedQuery<DashboardOverviewResult>(
+    queryKeys.dashboard(focusClassroomId),
+    dashboardPath,
+    Boolean(today.data),
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const start = useMutation({
+    retry: false,
     mutationFn: async (item: TodayClassResult) => {
-      const session = item.session ?? await apiRequest<ClassSessionResult>(`/api/timetable/${item.timetableEntry.id}/materialize`, { method: "POST", token, body: { localDate: today.data?.localDate } });
-      const live = await apiRequest<ClassSessionResult>(`/api/sessions/${session.id}/start`, { method: "POST", token, body: {} });
+      const session = item.session ?? await apiRequest<ClassSessionResult>(
+        `/api/timetable/${item.timetableEntry.id}/materialize`,
+        { method: "POST", token, body: { localDate: today.data?.localDate } },
+      );
+      const live = await apiRequest<ClassSessionResult>(
+        `/api/sessions/${session.id}/start`,
+        { method: "POST", token, body: {} },
+      );
       if (live.status !== "live") throw new Error("Session start was not confirmed by the server.");
       return live;
     },
-    onSuccess: async (session) => { queryClient.setQueryData(queryKeys.session(session.id), session); await invalidateSessionWorkflow(queryClient, session.id); router.push(`/sessions/${session.id}`); },
+    onSuccess: (session) => {
+      queryClient.setQueryData(queryKeys.session(session.id), session);
+      router.push(`/sessions/${session.id}`);
+      void invalidateSessionWorkflow(queryClient, session.id);
+    },
   });
 
-  if (today.isLoading) return <SafeScreen><SkeletonCard /><SkeletonCard /><SkeletonCard /></SafeScreen>;
-  if (today.error || !today.data) return <SafeScreen><ErrorState error={today.error} onRetry={() => void today.refetch()} /></SafeScreen>;
+  if (today.isLoading) {
+    return <SafeScreen><SkeletonCard /><SkeletonCard /><SkeletonCard /></SafeScreen>;
+  }
+  if (today.error || !today.data) {
+    return <SafeScreen><ErrorState error={today.error} onRetry={() => void today.refetch()} /></SafeScreen>;
+  }
 
   const data = today.data;
-  const live = data.classes.find((item) => item.status === "live");
-  const next = data.classes.find((item) => item.status === "scheduled");
-  const attendanceComplete = data.classes.filter((item) => item.session && item.session.attendanceRecordedCount >= item.session.enrolledStudentCount).length;
-  const actionCount = data.missedCount + data.incompleteAttendanceCount;
-  const remaining = Math.max(0, data.classes.length - data.completedCount - data.cancelledCount - data.missedCount);
-  const date = new Intl.DateTimeFormat("th-TH", { dateStyle: "full" }).format(new Date(`${data.localDate}T12:00:00`));
   const openItem = (item: TodayClassResult) => {
-    if (item.status === "scheduled" && isOnline) start.mutate(item);
-    else if (item.session) router.push(item.status === "completed" ? `/sessions/${item.session.id}/summary` : `/sessions/${item.session.id}`);
+    if (item.status === "scheduled") {
+      if (isOnline && !start.isPending && canStartScheduledSession(item.scheduledStart, item.scheduledEnd, now)) {
+        start.mutate(item);
+      }
+      return;
+    }
+    if (!item.session) return;
+    if (item.status === "live") {
+      router.push(`/sessions/${item.session.id}/attendance?classroomId=${item.timetableEntry.classroomId}`);
+      return;
+    }
+    if (item.status === "completed") router.push(`/sessions/${item.session.id}/summary`);
   };
 
-  return <SafeScreen stickyHeaderIndices={live ? [2] : undefined} refreshControl={<RefreshControl refreshing={today.isRefetching} onRefresh={() => void today.refetch()} tintColor={colors.primary} />}>
-    <OfflineBanner visible={!isOnline} lastUpdated={today.dataUpdatedAt} />
-    <AppHeader title={`สวัสดีครับ ครู${user?.firstName ?? ""}`} subtitle={`${user?.schoolName ?? ""} · ${date}`} />
-    {data.holiday ? (
-      <Card>
-        <StatusBadge label="วันหยุด" tone="warning" />
-        <ThemedText style={styles.holidayTitle}>{data.holiday.name}</ThemedText>
-        <ThemedText tone="muted">
-          {data.holiday.description ?? "วันนี้ถูกตั้งเป็นวันหยุดของโรงเรียน จึงไม่มีคาบเรียนจากตารางสอน"}
-        </ThemedText>
-      </Card>
-    ) : null}
-    <View style={[styles.pinned, live && { backgroundColor: colors.background }]}>
-      {live ? <><SectionHeader title="คาบที่กำลังสอน" action={<StatusBadge label="LIVE" tone="live" />} /><SessionCard item={live} primary /></> : next ? <><SectionHeader title="คาบถัดไป" /><SessionCard item={next} primary canMutate={isOnline} onStart={(item) => start.mutate(item)} /></> : null}
-    </View>
-    {start.error ? <ThemedText accessibilityRole="alert" tone="danger">{thaiErrorMessage(start.error)}</ThemedText> : null}
-    <SectionHeader title="ความคืบหน้าวันนี้" action={actionCount > 0 ? <StatusBadge label={`ติดตาม ${actionCount}`} tone="warning" /> : <StatusBadge label="เรียบร้อย" tone="success" />} />
-    <View style={styles.metrics}>
-      <MetricCard label="คาบทั้งหมด" value={data.classes.length} /><MetricCard label="เสร็จแล้ว" value={data.completedCount} /><MetricCard label="คาบที่เหลือ" value={remaining} /><MetricCard label="เช็กชื่อครบ" value={attendanceComplete} />
-    </View>
-    <Card><ProgressBar label="คาบที่สอนเสร็จ" value={data.completedCount} max={data.classes.length} tone="success" /><ProgressBar label="การเช็กชื่อครบถ้วน" value={attendanceComplete} max={data.classes.length} tone={actionCount > 0 ? "warning" : "success"} /></Card>
-    {actionCount > 0 ? <Card><ThemedText tone="warning" style={styles.actionTitle}>รายการที่ควรตรวจสอบ</ThemedText>{data.missedCount > 0 ? <ThemedText>• คาบที่พลาด {data.missedCount} คาบ</ThemedText> : null}{data.incompleteAttendanceCount > 0 ? <ThemedText>• เช็กชื่อยังไม่ครบ {data.incompleteAttendanceCount} คาบ</ThemedText> : null}</Card> : null}
-    <SectionHeader title="ไทม์ไลน์วันนี้" />
-    {data.classes.length ? ([(["ช่วงเช้า", groups.morning] as const), (["ช่วงบ่าย", groups.afternoon] as const)]).map(([label, items]) => items.length ? <Card key={label}>
-      <ThemedText style={styles.groupTitle}>{label}</ThemedText>
-      <Timeline>{items.map((item) => <TimelineItem key={item.timetableEntry.id} title={`${formatRange(item)} · ${item.timetableEntry.classroomName}`} description={`${item.timetableEntry.subjectName}${item.timetableEntry.room ? ` · ห้อง ${item.timetableEntry.room}` : ""}`} status={timelineStatus(item.status)}>
-        <StatusBadge label={statusLabels[item.status]} tone={item.status === "live" ? "live" : item.status === "completed" ? "success" : item.status === "cancelled" || item.status === "missed" ? "danger" : "neutral"} />
-        {(item.status === "scheduled" || item.status === "live" || item.status === "completed") ? <AppButton label={item.status === "scheduled" ? "เริ่มคาบ" : item.status === "live" ? "กลับเข้าสู่คาบ" : "ดูสรุป"} tone="secondary" disabled={item.status === "scheduled" && (!isOnline || start.isPending)} onPress={() => openItem(item)} /> : null}
-      </TimelineItem>)}</Timeline>
-    </Card> : null) : <EmptyState title={data.holiday ? "วันนี้เป็นวันหยุด" : "วันนี้ไม่มีคาบสอน"} description={data.holiday ? "ระบบจะไม่สร้างคาบเรียนจากตารางสอนในวันนี้" : "พักผ่อนหรือเตรียมคาบถัดไปได้เลย"} />}
-  </SafeScreen>;
-}
+  const refresh = () => {
+    void Promise.all([today.refetch(), dashboard.refetch()]);
+  };
 
-const styles = StyleSheet.create({ pinned: { gap: spacing.md, borderRadius: 18 }, metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md }, actionTitle: { fontSize: 17, fontWeight: "800" }, groupTitle: { fontSize: 18, fontWeight: "800" }, holidayTitle: { marginTop: spacing.sm, fontSize: 20, fontWeight: "900" } });
+  return (
+    <SafeScreen
+      refreshControl={(
+        <RefreshControl
+          refreshing={today.isRefetching || dashboard.isRefetching}
+          onRefresh={refresh}
+          tintColor={colors.primary}
+        />
+      )}
+    >
+      <OfflineBanner visible={!isOnline} lastUpdated={Math.max(today.dataUpdatedAt, dashboard.dataUpdatedAt)} />
+      {data.holiday ? (
+        <Card>
+          <StatusBadge label="วันหยุด" tone="warning" />
+          <ThemedText style={{ marginTop: spacing.sm, fontSize: 20, fontWeight: "900" }}>
+            {data.holiday.name}
+          </ThemedText>
+          <ThemedText tone="muted">
+            {data.holiday.description ?? "วันนี้เป็นวันหยุดตามปฏิทินโรงเรียน"}
+          </ThemedText>
+        </Card>
+      ) : null}
+      {start.error ? (
+        <ThemedText accessibilityRole="alert" tone="danger">
+          {thaiErrorMessage(start.error)}
+        </ThemedText>
+      ) : null}
+      <TodayDashboard
+        user={user}
+        data={data}
+        overview={dashboard.data}
+        now={now}
+        isOnline={isOnline}
+        isStarting={start.isPending}
+        onOpen={openItem}
+      />
+    </SafeScreen>
+  );
+}

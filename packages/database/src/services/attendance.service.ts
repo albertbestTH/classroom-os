@@ -26,12 +26,14 @@ import { createSessionTimelineEventForSchool } from "../repositories/session-tim
 import { requireTenantReferencesForSchool } from "../repositories/reference.repository.js";
 import { correctAttendanceSchema, updateAttendanceBatchSchema } from "../validation.js";
 import { executeTenantService, toAttendanceResult } from "./service-utils.js";
+import { reconcileExpiredClassSessions } from "./session.service.js";
 
 export function updateAttendanceBatch(
   input: UpdateAttendanceBatchInput,
 ): Promise<BatchServiceResult<AttendanceRecordResult>> {
   return executeTenantService(input, async () => {
     const parsed = updateAttendanceBatchSchema.parse(input);
+    await reconcileExpiredClassSessions({ schoolId: parsed.schoolId });
     return getPrismaClient().$transaction(async (transaction) => {
       const session = await requireAttendanceSessionForSchool(transaction, parsed);
       if (session.status === "completed" || session.status === "cancelled") {
@@ -112,6 +114,7 @@ export function getSessionAttendanceRoster(input: {
   sessionId: string;
 }): Promise<SessionAttendanceResult> {
   return executeTenantService(input, async () => {
+    await reconcileExpiredClassSessions({ schoolId: input.schoolId });
     const { session, enrollments, records } = await listAttendanceRosterForSchool(
       getPrismaClient(),
       input,
@@ -177,6 +180,7 @@ export function correctCompletedAttendance(
       ...input,
       actorUserId: auth.userId,
     });
+    await reconcileExpiredClassSessions({ schoolId: parsed.schoolId });
     return getPrismaClient().$transaction(async (transaction) => {
       const session = await requireAttendanceSessionForSchool(transaction, parsed);
       if (session.status !== "completed") {

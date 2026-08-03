@@ -23,6 +23,7 @@ import {
   createSessionFromTimetableInScopeForSchool,
   findMaterializedSessionForSchool,
   findLiveSessionForTeacherForSchool,
+  listExpiredLiveSessionsForSchool,
   requireClassSessionDetailsForSchool,
   requireClassSessionForSchool,
   transitionClassSessionForSchool,
@@ -40,6 +41,7 @@ import {
 } from "../validation.js";
 import { executeTenantService, toClassSessionResult } from "./service-utils.js";
 import { holidayConflictError } from "./school-holiday.service.js";
+import { requireSessionStartTime } from "./session-time-policy.js";
 import { isoWeekday, localDateForInstant, localDateTimeToInstant } from "./timezone.js";
 
 const sessionIdSchema = z.object({
@@ -52,6 +54,11 @@ const materializeSchema = z.object({
   actorUserId: z.string().uuid().nullable().optional(),
   timetableEntryId: z.string().uuid(),
   localDate: z.string().date(),
+});
+
+const reconcileExpiredSchema = z.object({
+  schoolId: z.string().uuid(),
+  observedAt: z.date().optional(),
 });
 
 function clock(value: Date): string {
@@ -170,10 +177,19 @@ export function startClassSession(
   return executeTenantService(input, async () => {
     const parsed = startClassSessionSchema.parse(input);
     const prisma = getPrismaClient();
+    const occurredAt = parsed.startedAt ? new Date(parsed.startedAt) : new Date();
+    await reconcileExpiredClassSessions({
+      schoolId: parsed.schoolId,
+      observedAt: occurredAt,
+    });
     const sessionId = await prisma.$transaction(async (transaction) => {
       const current = await requireClassSessionForSchool(transaction, parsed);
       if (current.status === "live") {
-        return current.id;
+        throw domainError(
+          "INVALID_STATE_TRANSITION",
+          "This class session has already been started.",
+          { currentStatus: current.status, requestedStatus: "live" },
+        );
       }
       if (current.status !== "scheduled") {
         throw domainError(
@@ -182,6 +198,7 @@ export function startClassSession(
           { currentStatus: current.status, requestedStatus: "live" },
         );
       }
+      requireSessionStartTime(current, occurredAt);
       const overlapping = await findLiveSessionForTeacherForSchool(transaction, {
         schoolId: parsed.schoolId,
         teacherId: current.teacherId,
@@ -190,7 +207,6 @@ export function startClassSession(
       if (overlapping) {
         throw domainError("CONFLICT", "The teacher already has a live class session.");
       }
-      const occurredAt = parsed.startedAt ? new Date(parsed.startedAt) : new Date();
       const session = await transitionClassSessionForSchool(transaction, {
         schoolId: parsed.schoolId,
         sessionId: parsed.sessionId,
@@ -237,7 +253,11 @@ export function endClassSession(input: EndClassSessionInput): Promise<ClassSessi
     const sessionId = await prisma.$transaction(async (transaction) => {
       const current = await requireClassSessionForSchool(transaction, parsed);
       if (current.status === "completed") {
-        return current.id;
+        throw domainError(
+          "INVALID_STATE_TRANSITION",
+          "This class session has already ended.",
+          { currentStatus: current.status, requestedStatus: "completed" },
+        );
       }
       if (current.status !== "live") {
         throw domainError(
@@ -283,6 +303,54 @@ export function endClassSession(input: EndClassSessionInput): Promise<ClassSessi
         sessionId,
       }),
     );
+  });
+}
+
+export function reconcileExpiredClassSessions(input: {
+  schoolId: string;
+  observedAt?: Date;
+}): Promise<number> {
+  return executeTenantService(input, async () => {
+    const parsed = reconcileExpiredSchema.parse(input);
+    const observedAt = parsed.observedAt ?? new Date();
+    const prisma = getPrismaClient();
+    return prisma.$transaction(async (transaction) => {
+      const expired = await listExpiredLiveSessionsForSchool(transaction, {
+        schoolId: parsed.schoolId,
+        observedAt,
+      });
+      let completedCount = 0;
+      for (const current of expired) {
+        const session = await transitionClassSessionForSchool(transaction, {
+          schoolId: parsed.schoolId,
+          sessionId: current.id,
+          fromStatus: "live",
+          toStatus: "completed",
+          occurredAt: current.scheduledEnd,
+        });
+        if (!session) continue;
+        completedCount += 1;
+        await createSessionTimelineEventForSchool(transaction, {
+          schoolId: parsed.schoolId,
+          classSessionId: session.id,
+          actorUserId: null,
+          eventType: "SESSION_ENDED",
+          metadata: {
+            occurredAt: current.scheduledEnd.toISOString(),
+            automatic: true,
+          },
+        });
+        await createAuditLogForSchool(transaction, {
+          schoolId: parsed.schoolId,
+          actorUserId: null,
+          action: "session.auto_ended",
+          entityType: "ClassSession",
+          entityId: session.id,
+          metadata: { from: "live", to: "completed" },
+        });
+      }
+      return completedCount;
+    });
   });
 }
 
@@ -356,6 +424,7 @@ export function getClassSession(
 ): Promise<ClassSessionResult> {
   return executeTenantService(input, async () => {
     const parsed = sessionIdSchema.parse(input);
+    await reconcileExpiredClassSessions({ schoolId: parsed.schoolId });
     return toClassSessionResult(
       await requireClassSessionDetailsForSchool(getPrismaClient(), parsed),
     );
@@ -367,6 +436,7 @@ export function listClassSessionTimeline(
 ): Promise<SessionTimelineEventResult[]> {
   return executeTenantService(input, async () => {
     const parsed = sessionIdSchema.parse(input);
+    await reconcileExpiredClassSessions({ schoolId: parsed.schoolId });
     await requireClassSessionForSchool(getPrismaClient(), parsed);
     const events = await listSessionTimelineForSchool(getPrismaClient(), parsed);
     return events.map((event) => ({

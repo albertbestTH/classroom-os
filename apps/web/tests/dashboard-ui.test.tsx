@@ -39,6 +39,15 @@ describe("dashboard visualization states", () => {
     expect(sessions).toContain("วันนี้ยังไม่มีคาบเรียน");
   });
 
+  it("renders a stable SVG attendance donut with all attendance statuses", () => {
+    const donut = renderToStaticMarkup(<AttendanceDonutChart totals={{ present: 24, late: 2, absent: 1, leave: 1, unrecorded: 2 }} eligibleCount={30} attendancePercentage={80} />);
+    expect(donut).toContain("<svg");
+    expect(donut).toContain('pathLength="100"');
+    expect(donut).toContain("มาเรียน");
+    expect(donut).toContain("ยังไม่เช็กชื่อ");
+    expect(donut).toContain("80%");
+  });
+
   it("maps attendance quick action to the real completion state", () => {
     expect(getAttendanceActionState(attendanceClass(0, 30))).toMatchObject({ title: "เช็กชื่อ", caption: "บันทึกการเข้าเรียน", state: "idle" });
     expect(getAttendanceActionState(attendanceClass(12, 30))).toMatchObject({ title: "เช็กชื่อต่อ", caption: "เช็กแล้ว 12/30 คน", state: "partial" });

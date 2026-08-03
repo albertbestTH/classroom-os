@@ -14,6 +14,7 @@ import { listAcademicYears, listTerms } from "./academic-calendar.service.js";
 import { executeTenantService, toClassSessionResult, toTimetableEntryResult } from "./service-utils.js";
 import { isoWeekday, localDateTimeToInstant, schoolDayBounds } from "./timezone.js";
 import { toSchoolHolidayResult } from "./school-holiday.service.js";
+import { reconcileExpiredClassSessions } from "./session.service.js";
 import { toTimetableCoverageResult } from "./timetable-coverage.service.js";
 
 export function getTodayTimetable(input: {
@@ -24,6 +25,10 @@ export function getTodayTimetable(input: {
 }): Promise<TodayTimetableResult> {
   return executeTenantService(input, async () => {
     const prisma = getPrismaClient();
+    await reconcileExpiredClassSessions({
+      schoolId: input.schoolId,
+      observedAt: input.now,
+    });
     const school = await requireSchoolSettingsForSchool(prisma, input);
     const day = schoolDayBounds(school.timezone, input.now);
     const holiday = await findActiveSchoolHolidayForSchool(prisma, {

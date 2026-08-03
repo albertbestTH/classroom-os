@@ -1,7 +1,7 @@
 import type { ClassSessionResult, ClassroomResult, TeachingAssignmentResult, TimetableCoverageResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppButton, AppHeader, Card, Chip, EmptyState, ErrorState, ListTile, OfflineBanner, SafeScreen, SearchBar, SectionHeader, SkeletonCard, StatusBadge, ThemedText } from "@/components/ui/primitives";
@@ -15,6 +15,7 @@ import { matchesSearch } from "@/lib/search";
 import { formatTimetableTime } from "@/lib/time";
 import { queryPolicyForKey } from "@/lib/operational-query-policy";
 import { invalidateSessionWorkflow, queryKeys } from "@/lib/query-keys";
+import { canStartScheduledSession } from "@/features/sessions/session-time";
 
 const weekdays = [
   { value: 1, label: "วันจันทร์" }, { value: 2, label: "วันอังคาร" }, { value: 3, label: "วันพุธ" },
@@ -31,6 +32,12 @@ export function ClassesScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const initial = setTimeout(() => setNow(Date.now()), 0);
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => { clearTimeout(initial); clearInterval(timer); };
+  }, []);
   const [assignments, timetable, classrooms, today, coverages] = useQueries({ queries: [
     { queryKey: queryKeys.assignments, queryFn: () => apiRequest<TeachingAssignmentResult[]>("/api/teaching-assignments", { token }), ...queryPolicyForKey(queryKeys.assignments) },
     { queryKey: queryKeys.timetable, queryFn: () => apiRequest<TimetableEntryResult[]>("/api/timetable", { token }), ...queryPolicyForKey(queryKeys.timetable) },
@@ -114,7 +121,7 @@ export function ClassesScreen() {
           <View style={styles.row}><View style={styles.flex}><ThemedText tone="primary" style={styles.time}>{formatTimetableTime(entry.startTime)}–{formatTimetableTime(entry.endTime)} น.</ThemedText><ThemedText style={styles.classroom}>{entry.classroomName}</ThemedText><ThemedText>{entry.subjectName}</ThemedText></View>{todayClass ? <StatusBadge label={todayClass.status === "live" ? "LIVE" : todayClass.status === "completed" ? "เสร็จแล้ว" : todayClass.status === "scheduled" ? "วันนี้" : "ยกเลิก"} tone={todayClass.status === "live" ? "live" : todayClass.status === "completed" ? "success" : todayClass.status === "cancelled" ? "danger" : "neutral"} /> : <StatusBadge label="งานสอนปัจจุบัน" />}</View>
           <ThemedText tone="muted">{entry.room ? `ห้อง ${entry.room} · ` : ""}นักเรียน {classroom?.studentCount ?? 0} คน · ครู {entry.teacherName}</ThemedText>
           {todayClass?.status === "live" && todayClass.session ? <AppButton label="กลับเข้าสู่คาบที่กำลังสอน" onPress={() => router.push(`/sessions/${todayClass.session!.id}`)} /> : null}
-          {todayClass?.status === "scheduled" ? <AppButton label={start.isPending ? "กำลังเริ่มคาบ…" : "เริ่มคาบ"} onPress={() => start.mutate(todayClass)} disabled={!isOnline || start.isPending} /> : null}
+          {todayClass?.status === "scheduled" ? <AppButton label={start.isPending ? "กำลังเริ่มคาบ…" : canStartScheduledSession(todayClass.scheduledStart, todayClass.scheduledEnd, now) ? "เริ่มคาบ" : "ยังไม่ถึงเวลาเริ่ม"} onPress={() => start.mutate(todayClass)} disabled={!isOnline || start.isPending || !canStartScheduledSession(todayClass.scheduledStart, todayClass.scheduledEnd, now)} /> : null}
           {todayClass?.status === "completed" && todayClass.session ? <AppButton label="ดูสรุปคาบ" tone="secondary" onPress={() => router.push(`/sessions/${todayClass.session!.id}/summary`)} /> : null}
           {assignment ? <AppButton label="ดูรายละเอียดชั้นเรียน" tone="secondary" onPress={() => router.push(`/classes/${assignment.id}`)} /> : null}
         </Card>;

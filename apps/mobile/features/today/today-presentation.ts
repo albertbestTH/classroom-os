@@ -14,6 +14,12 @@ export function groupTodayClasses(classes: TodayClassResult[]): Record<DayPeriod
   }, { morning: [], afternoon: [] });
 }
 
+export function sortTodayClassesByStartTime(classes: TodayClassResult[]): TodayClassResult[] {
+  return [...classes].sort((left, right) =>
+    new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime()
+    || left.timetableEntry.id.localeCompare(right.timetableEntry.id));
+}
+
 export function timelineStatus(status: TodayClassStatus): "complete" | "current" | "upcoming" | "cancelled" {
   if (status === "completed") return "complete";
   if (status === "live") return "current";

@@ -30,13 +30,22 @@ export function SessionScreen({ id }: { id: string }) {
     Boolean(session.data?.classroomId),
   );
   const timeline = useAuthenticatedQuery<SessionTimelineEventResult[]>(queryKeys.timeline(id), `/api/sessions/${id}/timeline`);
+  const refetchSession = session.refetch;
 
   useEffect(() => {
-    const initial = setTimeout(() => setNow(Date.now()), 0);
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    const tick = () => setNow(Date.now());
+    tick();
+    const timer = setInterval(tick, 1_000);
     const subscription = AppState.addEventListener("change", (state) => { if (state === "active") setNow(Date.now()); });
-    return () => { clearTimeout(initial); clearInterval(timer); subscription.remove(); };
+    return () => { clearInterval(timer); subscription.remove(); };
   }, []);
+
+  useEffect(() => {
+    if (session.data?.status !== "live") return;
+    const delay = Math.max(0, new Date(session.data.scheduledEnd).getTime() - Date.now()) + 100;
+    const timer = setTimeout(() => void refetchSession(), delay);
+    return () => clearTimeout(timer);
+  }, [refetchSession, session.data?.scheduledEnd, session.data?.status]);
 
   useEffect(() => {
     if (!attendanceSaved) return;
@@ -72,7 +81,7 @@ export function SessionScreen({ id }: { id: string }) {
     <AppHeader title={data.classroomName} subtitle={`${data.subjectName} · ${data.termName}`} />
     <View style={styles.row}>
       <StatusBadge label={data.status === "live" ? "LIVE · กำลังสอน" : data.status.toUpperCase()} tone={data.status === "live" ? "live" : data.status === "completed" ? "success" : data.status === "cancelled" ? "danger" : "neutral"} />
-      {data.status === "live" ? <View style={styles.timers}><ThemedText accessibilityLabel={`เวลาที่สอน ${formatElapsed(data.startedAt, now)}`} tone="primary" style={styles.timer}>{formatElapsed(data.startedAt, now)}</ThemedText><ThemedText tone="muted" style={styles.remaining}>เหลือตามตาราง {formatRemaining(data.scheduledEnd, now)}</ThemedText></View> : null}
+      {data.status === "live" ? <View style={styles.timers}><ThemedText accessibilityLabel={`เวลาที่สอน ${formatElapsed(data.startedAt ?? data.scheduledStart, now)}`} tone="primary" style={styles.timer}>{formatElapsed(data.startedAt ?? data.scheduledStart, now)}</ThemedText><ThemedText tone="muted" style={styles.remaining}>เหลือตามตาราง {formatRemaining(data.scheduledEnd, now)}</ThemedText></View> : null}
     </View>
     {attendance.isLoading ? <LoadingSkeleton /> : attendance.error || !attendanceSummary ? <ErrorState error={attendance.error} onRetry={() => void attendance.refetch()} /> : <AttendanceSummaryCard summary={attendanceSummary} />}
     <Card>
@@ -83,7 +92,7 @@ export function SessionScreen({ id }: { id: string }) {
       <ThemedText style={styles.heading}>ไทม์ไลน์คาบเรียน</ThemedText>
       {timeline.data?.length ? <Timeline>{timeline.data.map((event) => <TimelineItem key={event.id} title={event.eventType} description={new Intl.DateTimeFormat("th-TH", { timeStyle: "short" }).format(new Date(event.createdAt))} status="complete" />)}</Timeline> : <ThemedText tone="muted" style={styles.muted}>ยังไม่มีกิจกรรมเพิ่มเติม</ThemedText>}
     </Card>
-    {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" disabled={!isOnline} accessibilityHint={!isOnline ? "ต้องเชื่อมต่ออินเทอร์เน็ตก่อนจบคาบ" : undefined} onPress={() => setConfirm(true)} /> : null}
+    {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" disabled={!isOnline || end.isPending} accessibilityHint={!isOnline ? "ต้องเชื่อมต่ออินเทอร์เน็ตก่อนจบคาบ" : undefined} onPress={() => setConfirm(true)} /> : null}
     {end.error ? <ThemedText accessibilityRole="alert" tone="danger">{thaiErrorMessage(end.error)} กรุณาโหลดสถานะใหม่</ThemedText> : null}
     <ConfirmationModal visible={confirm} title="ยืนยันจบคาบ" description={`${data.classroomName} · ${data.subjectName}${incomplete ? "\nยังเช็กชื่อไม่ครบ กรุณาตรวจสอบก่อนยืนยัน" : ""}`} confirmLabel={end.isPending ? "กำลังจบคาบ…" : "ยืนยันจบคาบ"} destructive onConfirm={() => { if (!end.isPending) end.mutate(); }} onCancel={() => setConfirm(false)} />
     <Snackbar visible={attendanceSaved} message="บันทึกการเช็กชื่อเรียบร้อยแล้ว" />

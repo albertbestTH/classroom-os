@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 export const queryKeys = {
   today: ["today"] as const,
+  dashboard: (classroomId?: string) => ["dashboard", classroomId ?? "all"] as const,
   timetable: ["timetable"] as const,
   assignments: ["assignments"] as const,
   classrooms: ["classrooms"] as const,
@@ -30,6 +31,7 @@ export async function invalidateSessionWorkflow(
     queryClient.invalidateQueries({ queryKey: queryKeys.attendance(sessionId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.timeline(sessionId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.today }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.timetable }),
     queryClient.invalidateQueries({ queryKey: queryKeys.assignments }),
   ]);

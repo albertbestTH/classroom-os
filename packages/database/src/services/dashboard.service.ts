@@ -53,6 +53,28 @@ function dashboardPercentage(totals: AttendanceStatusTotals): number {
   return ratio(totals.present + totals.late, eligible);
 }
 
+function attendanceTotalCount(totals: AttendanceStatusTotals): number {
+  return Object.values(totals).reduce((sum, value) => sum + value, 0);
+}
+
+function dashboardTodayTotals(
+  report: Awaited<ReturnType<typeof getAttendanceReport>> | null,
+  classroomId?: string,
+): AttendanceStatusTotals {
+  if (!report) return emptyTotals();
+  if (!classroomId) return report.totals;
+
+  const sessions = report.sessions
+    .filter((session) => session.classroomId === classroomId)
+    .sort((left, right) => right.scheduledStart.localeCompare(left.scheduledStart));
+  const representative =
+    sessions.find(({ status }) => status === "live") ??
+    sessions.find(({ recordedCount }) => recordedCount > 0) ??
+    sessions.find(({ totals }) => attendanceTotalCount(totals) > 0);
+
+  return representative?.totals ?? emptyTotals();
+}
+
 function filterTodayClasses(
   classes: TodayClassResult[],
   filters: DashboardOverviewFilters,
@@ -215,7 +237,7 @@ export function getDashboardOverview(input: DashboardInput): Promise<DashboardOv
     };
     const liveSession = visibleClasses.find(({ status }) => status === "live") ?? null;
 
-    const todayTotals = todayReport?.totals ?? emptyTotals();
+    const todayTotals = dashboardTodayTotals(todayReport, filters.classroomId);
     const eligibleCount = Object.values(todayTotals).reduce((sum, value) => sum + value, 0);
     const recordedCount = eligibleCount - todayTotals.unrecorded;
     const attendedCount = todayTotals.present + todayTotals.late;

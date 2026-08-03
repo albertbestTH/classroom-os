@@ -109,6 +109,21 @@ export function findLiveSessionForTeacherForSchool(
   });
 }
 
+export function listExpiredLiveSessionsForSchool(
+  client: SessionReadClient,
+  input: TenantScope & { observedAt: Date },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.classSession.findMany({
+    where: {
+      schoolId,
+      status: "live",
+      scheduledEnd: { lte: input.observedAt },
+    },
+    orderBy: [{ scheduledEnd: "asc" }, { id: "asc" }],
+  });
+}
+
 export async function requireClassSessionForSchool(
   client: SessionReadClient,
   input: TenantScope & { sessionId: string },

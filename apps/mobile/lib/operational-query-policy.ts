@@ -5,7 +5,7 @@ export const STABLE_STALE_TIME = 5 * 60_000;
 export const OPERATIONAL_GC_TIME = 12 * 60 * 60_000;
 
 export const operationalQueryRoots = new Set([
-  "today", "timetable", "assignments", "session", "attendance", "timeline", "gradebook", "timetable-coverages",
+  "today", "dashboard", "timetable", "assignments", "session", "attendance", "timeline", "gradebook", "timetable-coverages",
 ]);
 
 export function isOperationalQueryKey(queryKey: QueryKey): boolean {
