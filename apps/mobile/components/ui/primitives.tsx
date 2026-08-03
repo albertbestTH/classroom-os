@@ -17,11 +17,11 @@ export function SectionCard({ children, style }: PropsWithChildren<{ style?: Sty
 export const Card = SectionCard;
 export function SectionHeader({ title, action }: { title: string; action?: ReactNode }) { const { colors } = useTheme(); return <View style={styles.row}><Text accessibilityRole="header" style={[styles.section, { color: colors.text }]}>{title}</Text>{action}</View>; }
 
-type ButtonProps = PressableProps & { label: string; tone?: "primary" | "secondary" | "danger" };
+type ButtonProps = PressableProps & { label: string; tone?: "primary" | "secondary" | "danger" | "inverse" };
 export function AppButton({ label, tone = "primary", disabled, style, ...props }: ButtonProps) {
   const { colors } = useTheme();
-  const background = tone === "danger" ? colors.danger : tone === "secondary" ? colors.primarySoft : colors.primary;
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} style={(state) => [styles.button, { backgroundColor: background, borderColor: tone === "secondary" ? colors.primary : background }, state.pressed && styles.pressed, disabled && styles.disabled, typeof style === "function" ? style(state) : style]} {...props}><Text style={[styles.buttonText, { color: tone === "secondary" ? colors.primaryDark : colors.onPrimary }]}>{label}</Text></Pressable>;
+  const background = tone === "danger" ? colors.danger : tone === "secondary" ? colors.primarySoft : tone === "inverse" ? colors.onPrimary : colors.primary;
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} style={(state) => [styles.button, { backgroundColor: background, borderColor: tone === "secondary" ? colors.primary : background }, state.pressed && styles.pressed, disabled && styles.disabled, typeof style === "function" ? style(state) : style]} {...props}><Text style={[styles.buttonText, { color: tone === "secondary" || tone === "inverse" ? colors.primaryDark : colors.onPrimary }]}>{label}</Text></Pressable>;
 }
 
 export function Avatar({ label, imageUri, size = 48 }: { label: string; imageUri?: string | null; size?: number }) {
