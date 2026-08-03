@@ -85,7 +85,7 @@ export function StudentDirectory() {
           fetch("/api/terms", { signal: controller.signal, cache: "no-store" }).then((response) => readApiData<TermResult[]>(response)),
         ]);
         const classroomMap = new Map(classrooms.map((item) => [item.id, item]));
-        const teacher = user.role === "TEACHER";
+        const teacher = user.role === "TEACHER" || user.workspaceType === "PERSONAL";
         const nextOptions = teacher
           ? assignments.map((assignment) => ({
               key: `${assignment.classroomId}:${assignment.termId}`,

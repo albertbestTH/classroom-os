@@ -15,19 +15,21 @@ import {
   requiredString,
   withAuthenticatedApi,
 } from "@/lib/api";
+import { effectiveTeachingContext } from "@/lib/teaching-scope";
 
 export async function GET(request: NextRequest) {
-  return withAuthenticatedApi(request, {}, async ({ context }) => {
+  return withAuthenticatedApi(request, {}, async ({ context, user }) => {
+    const teachingContext = effectiveTeachingContext(context, user);
     const classroomId = request.nextUrl.searchParams.get("classroomId") ?? undefined;
     const termId = request.nextUrl.searchParams.get("termId") ?? undefined;
-    if (context.role === "TEACHER") {
+    if (teachingContext.role === "TEACHER") {
       if (!classroomId || !termId) {
         throw domainError(
           "VALIDATION_ERROR",
           "Teachers must select an assigned classroom and term.",
         );
       }
-      await requireClassroomAccess(context, { classroomId, termId });
+      await requireClassroomAccess(teachingContext, { classroomId, termId });
     } else if (classroomId) {
       await requireClassroomAccess(context, { classroomId, termId });
     }
@@ -45,15 +47,16 @@ export async function POST(request: NextRequest) {
   return withAuthenticatedApi(
     request,
     { mutation: true, json: true },
-    async ({ context }, body = {}) => {
+    async ({ context, user }, body = {}) => {
+      const teachingContext = effectiveTeachingContext(context, user);
       requireRole(context, ["SCHOOL_OWNER", "ADMIN", "TEACHER"]);
       const classroomId = typeof body.classroomId === "string" ? body.classroomId : undefined;
       const termId = typeof body.termId === "string" ? body.termId : undefined;
-      if (context.role === "TEACHER") {
+      if (teachingContext.role === "TEACHER") {
         if (!classroomId || !termId) {
           throw domainError("VALIDATION_ERROR", "กรุณาเลือกห้องเรียนและภาคเรียน");
         }
-        await requireClassroomAccess(context, { classroomId, termId });
+        await requireClassroomAccess(teachingContext, { classroomId, termId });
       }
       return createStudent(
         trustedTenantInput(context, {

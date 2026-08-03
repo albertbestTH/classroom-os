@@ -14,13 +14,15 @@ import {
   optionalString,
   withAuthenticatedApi,
 } from "@/lib/api";
+import { effectiveTeachingContext } from "@/lib/teaching-scope";
 
 type StudentRouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, route: StudentRouteContext) {
-  return withAuthenticatedApi(request, {}, async ({ context }) => {
+  return withAuthenticatedApi(request, {}, async ({ context, user }) => {
+    const teachingContext = effectiveTeachingContext(context, user);
     const { id } = await route.params;
-    await requireStudentAccess(context, id);
+    await requireStudentAccess(teachingContext, id);
     return getStudent({ schoolId: context.schoolId, studentId: id });
   });
 }
@@ -29,9 +31,10 @@ export async function PATCH(request: NextRequest, route: StudentRouteContext) {
   return withAuthenticatedApi(
     request,
     { mutation: true, json: true },
-    async ({ context }, body = {}) => {
+    async ({ context, user }, body = {}) => {
       requireRole(context, ["SCHOOL_OWNER", "ADMIN"]);
       const { id } = await route.params;
+      await requireStudentAccess(effectiveTeachingContext(context, user), id);
       const classroomId = optionalString(body, "classroomId");
       const termId = optionalString(body, "termId");
       return updateStudent(

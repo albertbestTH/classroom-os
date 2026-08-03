@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { PUT as putScores } from "@/app/api/assessments/[id]/scores/route";
+import { GET as getClassrooms } from "@/app/api/classrooms/route";
 import {
   GET as getAttendance,
   PUT as putAttendance,
@@ -17,6 +18,7 @@ import { POST as endSession } from "@/app/api/sessions/[id]/end/route";
 import { POST as startSession } from "@/app/api/sessions/[id]/start/route";
 import { GET as getStaff } from "@/app/api/staff/route";
 import { GET as getStudents, POST as postStudent } from "@/app/api/students/route";
+import { GET as getTeachingAssignments } from "@/app/api/teaching-assignments/route";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 import { createPrismaClient, disconnectPrisma } from "../../../packages/database/src/client.js";
 import type { PrismaClient } from "../../../packages/database/src/generated/prisma/client.js";
@@ -275,6 +277,14 @@ describe("authenticated API routes", () => {
     );
     expect(attendanceB.status).toBe(200);
 
+    const routeNow = new Date();
+    await prisma.classSession.update({
+      where: { id: sessionA.id },
+      data: {
+        scheduledStart: new Date(routeNow.getTime() - 60_000),
+        scheduledEnd: new Date(routeNow.getTime() + 30 * 60_000),
+      },
+    });
     expect((await startSession(
       apiRequest(`/api/sessions/${sessionA.id}/start`, { token: login.token, method: "POST", json: {} }),
       { params: Promise.resolve({ id: sessionA.id }) },
@@ -286,6 +296,10 @@ describe("authenticated API routes", () => {
       }),
       { params: Promise.resolve({ id: sessionA.id }) },
     )).status).toBe(200);
+    await prisma.classSession.update({
+      where: { id: sessionA.id },
+      data: { scheduledEnd: new Date(Date.now() - 1) },
+    });
     const ended = await endSession(
       apiRequest(`/api/sessions/${sessionA.id}/end`, { token: login.token, method: "POST", json: {} }),
       { params: Promise.resolve({ id: sessionA.id }) },
@@ -323,6 +337,64 @@ describe("authenticated API routes", () => {
       { params: Promise.resolve({ id: assessmentA.id }) },
     );
     expect(scoreWrongClass.status).toBe(403);
+  });
+
+  it("keeps a personal owner scoped to their own teaching assignments", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "api-personal-scope");
+    const password = "Synthetic!PersonalScope2026";
+    await prisma.classEnrollment.create({
+      data: {
+        schoolId: tenant.school.id,
+        termId: tenant.term.id,
+        classroomId: tenant.classroom.id,
+        studentId: tenant.student.id,
+      },
+    });
+    const otherClassroom = await prisma.classroom.create({
+      data: { schoolId: tenant.school.id, code: `OTHER-${randomUUID()}`, name: "Synthetic unassigned class", gradeLevel: "TEST-6" },
+    });
+    const otherStudent = await prisma.student.create({
+      data: { schoolId: tenant.school.id, studentNumber: `OTHER-${randomUUID()}`, firstName: "Other", lastName: "Student" },
+    });
+    await prisma.classEnrollment.create({
+      data: { schoolId: tenant.school.id, termId: tenant.term.id, classroomId: otherClassroom.id, studentId: otherStudent.id },
+    });
+    const otherTeacher = await prisma.teacher.create({
+      data: { schoolId: tenant.school.id, employeeCode: `OTHER-${randomUUID()}`, firstName: "Other", lastName: "Teacher" },
+    });
+    const otherAssignment = await prisma.teachingAssignment.create({
+      data: { schoolId: tenant.school.id, termId: tenant.term.id, teacherId: otherTeacher.id, classroomId: otherClassroom.id, subjectId: tenant.subject.id },
+    });
+    await prisma.school.update({ where: { id: tenant.school.id }, data: { workspaceType: "PERSONAL" } });
+    await prisma.user.update({
+      where: { id: tenant.user.id },
+      data: { role: "SCHOOL_OWNER", passwordHash: await hashPassword(password) },
+    });
+    const login = await authenticateWithPassword({ email: tenant.user.email, password });
+
+    const classroomsResponse = await getClassrooms(apiRequest("/api/classrooms", { token: login.token }));
+    const classroomsPayload = JSON.stringify(await classroomsResponse.json());
+    expect(classroomsResponse.status).toBe(200);
+    expect(classroomsPayload).toContain(tenant.classroom.id);
+    expect(classroomsPayload).not.toContain(otherClassroom.id);
+
+    const assignmentsResponse = await getTeachingAssignments(apiRequest("/api/teaching-assignments", { token: login.token }));
+    const assignmentsPayload = JSON.stringify(await assignmentsResponse.json());
+    expect(assignmentsResponse.status).toBe(200);
+    expect(assignmentsPayload).toContain(tenant.teachingAssignment.id);
+    expect(assignmentsPayload).not.toContain(otherAssignment.id);
+
+    expect((await getStudents(apiRequest("/api/students", { token: login.token }))).status).toBe(400);
+    const assignedStudents = await getStudents(apiRequest(
+      `/api/students?classroomId=${tenant.classroom.id}&termId=${tenant.term.id}`,
+      { token: login.token },
+    ));
+    expect(assignedStudents.status).toBe(200);
+    expect(JSON.stringify(await assignedStudents.json())).toContain(tenant.student.id);
+    expect((await getStudents(apiRequest(
+      `/api/students?classroomId=${otherClassroom.id}&termId=${tenant.term.id}`,
+      { token: login.token },
+    ))).status).toBe(403);
   });
 
   it("keeps owner/admin access school-wide and derives tenant scope from the session", async () => {

@@ -24,6 +24,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:status": "prisma migrate status",
     "db:bootstrap:auth": "tsx scripts/bootstrap-auth.ts",
+    "db:reset:personal-demo": "tsx scripts/reset-personal-demo.ts",
     "db:e2e:prepare": "tsx scripts/prepare-e2e.ts",
     "db:e2e:cleanup": "tsx scripts/cleanup-e2e.ts",
     "db:studio": "prisma studio",

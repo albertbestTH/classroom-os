@@ -7,17 +7,19 @@ import {
 import { NextRequest } from "next/server";
 
 import { optionalBoolean, requiredString, withAuthenticatedApi } from "@/lib/api";
+import { effectiveTeachingContext } from "@/lib/teaching-scope";
 
 export async function GET(request: NextRequest) {
-  return withAuthenticatedApi(request, {}, async ({ context }) =>
-    listClassrooms({
+  return withAuthenticatedApi(request, {}, async ({ context, user }) => {
+    const teachingContext = effectiveTeachingContext(context, user);
+    return listClassrooms({
       schoolId: context.schoolId,
       isActive: request.nextUrl.searchParams.get("isActive") === "false" ? false : true,
       gradeLevel: request.nextUrl.searchParams.get("gradeLevel") ?? undefined,
       termId: request.nextUrl.searchParams.get("termId") ?? undefined,
-      teacherId: context.role === "TEACHER" ? context.teacherId ?? undefined : undefined,
-    }),
-  );
+      teacherId: teachingContext.role === "TEACHER" ? teachingContext.teacherId ?? undefined : undefined,
+    });
+  });
 }
 
 export async function POST(request: NextRequest) {
