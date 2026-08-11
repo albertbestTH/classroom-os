@@ -3,19 +3,24 @@ import { Pressable, StyleSheet, TextInput, type TextInputProps } from "react-nat
 
 import { touchTargets } from "@/constants/tokens";
 
-type ScoreInputFieldProps = Pick<TextInputProps, "accessibilityLabel" | "maxLength" | "onChangeText" | "placeholder" | "style" | "value">;
+type ScoreInputFieldProps = Pick<TextInputProps, "accessibilityLabel" | "maxLength" | "onChangeText" | "onSubmitEditing" | "placeholder" | "style" | "submitBehavior" | "value"> & {
+  inputRef?: (input: TextInput | null) => void;
+};
 
-export function ScoreInputField(props: ScoreInputFieldProps) {
-  const inputRef = useRef<TextInput>(null);
+export function ScoreInputField({ inputRef: registerInput, ...props }: ScoreInputFieldProps) {
+  const localInputRef = useRef<TextInput>(null);
   return <Pressable
     accessibilityRole="none"
     testID="score-input-touch-target"
-    onPress={() => inputRef.current?.focus()}
+    onPress={() => localInputRef.current?.focus()}
     style={styles.touchTarget}
   >
     <TextInput
       {...props}
-      ref={inputRef}
+      ref={(input) => {
+        localInputRef.current = input;
+        registerInput?.(input);
+      }}
       editable
       keyboardType="decimal-pad"
       inputMode="decimal"

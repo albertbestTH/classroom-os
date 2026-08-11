@@ -1,7 +1,7 @@
 import type { ClassSessionResult, SessionAttendanceResult, SessionTimelineEventResult } from "@classroom-os/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 
 import { AppButton, AppHeader, Card, ConfirmationModal, ErrorState, LoadingSkeleton, OfflineBanner, SafeScreen, Snackbar, StatusBadge, ThemedText, Timeline, TimelineItem } from "@/components/ui/primitives";
@@ -16,13 +16,14 @@ import { invalidateSessionWorkflow, queryKeys } from "@/lib/query-keys";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { formatElapsed, formatRemaining } from "./session-time";
 
-export function SessionScreen({ id }: { id: string }) {
+export function SessionScreen({ id, scoreSavedParam }: { id: string; scoreSavedParam?: string }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
   const [confirm, setConfirm] = useState(false);
   const [now, setNow] = useState(0);
   const [attendanceSaved, setAttendanceSaved] = useState(() => Boolean(queryClient.getQueryData(queryKeys.attendanceSaveFeedback(id))));
+  const [scoreSaved, setScoreSaved] = useState(() => scoreSavedParam === "1" || Boolean(queryClient.getQueryData(queryKeys.scoreSaveFeedback(id))));
   const session = useAuthenticatedQuery<ClassSessionResult>(queryKeys.session(id), `/api/sessions/${id}`);
   const attendance = useAuthenticatedQuery<SessionAttendanceResult>(
     queryKeys.attendance(id),
@@ -31,6 +32,11 @@ export function SessionScreen({ id }: { id: string }) {
   );
   const timeline = useAuthenticatedQuery<SessionTimelineEventResult[]>(queryKeys.timeline(id), `/api/sessions/${id}/timeline`);
   const refetchSession = session.refetch;
+
+  useFocusEffect(useCallback(() => {
+    if (queryClient.getQueryData(queryKeys.attendanceSaveFeedback(id))) setAttendanceSaved(true);
+    if (scoreSavedParam === "1" || queryClient.getQueryData(queryKeys.scoreSaveFeedback(id))) setScoreSaved(true);
+  }, [id, queryClient, scoreSavedParam]));
 
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -53,6 +59,16 @@ export function SessionScreen({ id }: { id: string }) {
     const timer = setTimeout(() => setAttendanceSaved(false), 3_000);
     return () => clearTimeout(timer);
   }, [attendanceSaved, id, queryClient]);
+
+  useEffect(() => {
+    if (!scoreSaved && scoreSavedParam !== "1") return;
+    queryClient.removeQueries({ queryKey: queryKeys.scoreSaveFeedback(id), exact: true });
+    const timer = setTimeout(() => {
+      setScoreSaved(false);
+      if (scoreSavedParam === "1") router.setParams({ scoreSaved: undefined });
+    }, 3_000);
+    return () => clearTimeout(timer);
+  }, [id, queryClient, scoreSaved, scoreSavedParam]);
 
   const end = useMutation({
     mutationFn: async () => {
@@ -77,6 +93,8 @@ export function SessionScreen({ id }: { id: string }) {
   const incomplete = attendanceProgress.recorded < attendanceProgress.enrolled;
   return <SafeScreen>
     <OfflineBanner visible={!isOnline} lastUpdated={session.dataUpdatedAt} />
+    <Snackbar visible={attendanceSaved} message="บันทึกการเช็กชื่อเรียบร้อยแล้ว" />
+    <Snackbar visible={scoreSaved || scoreSavedParam === "1"} message="บันทึกคะแนนเรียบร้อยแล้ว" />
     <AppButton label="← กลับไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} />
     <AppHeader title={data.classroomName} subtitle={`${data.subjectName} · ${data.termName}`} />
     <View style={styles.row}>
@@ -95,7 +113,6 @@ export function SessionScreen({ id }: { id: string }) {
     {data.status === "live" ? <AppButton label="จบคาบเรียน" tone="danger" disabled={!isOnline || end.isPending} accessibilityHint={!isOnline ? "ต้องเชื่อมต่ออินเทอร์เน็ตก่อนจบคาบ" : undefined} onPress={() => setConfirm(true)} /> : null}
     {end.error ? <ThemedText accessibilityRole="alert" tone="danger">{thaiErrorMessage(end.error)} กรุณาโหลดสถานะใหม่</ThemedText> : null}
     <ConfirmationModal visible={confirm} title="ยืนยันจบคาบ" description={`${data.classroomName} · ${data.subjectName}${incomplete ? "\nยังเช็กชื่อไม่ครบ กรุณาตรวจสอบก่อนยืนยัน" : ""}`} confirmLabel={end.isPending ? "กำลังจบคาบ…" : "ยืนยันจบคาบ"} destructive onConfirm={() => { if (!end.isPending) end.mutate(); }} onCancel={() => setConfirm(false)} />
-    <Snackbar visible={attendanceSaved} message="บันทึกการเช็กชื่อเรียบร้อยแล้ว" />
   </SafeScreen>;
 }
 

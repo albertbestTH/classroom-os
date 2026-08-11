@@ -29,7 +29,29 @@ describe("teacher workflow hotfix", () => {
     expect(scores).toContain('keyboardType="decimal-pad"');
     expect(scores).toContain('inputMode="decimal"');
     expect(scores).toContain("showSoftInputOnFocus");
-    expect(scores).toContain("inputRef.current?.focus()");
+    expect(scores).toContain("localInputRef.current?.focus()");
+    expect(source("features/scores/quick-score-screen.tsx")).toContain("scoreInputs.current[nextStudent.studentId]?.focus()");
+  });
+
+  it("resolves the session score column and navigates only after a successful save", () => {
+    const scores = source("features/scores/quick-score-screen.tsx");
+    expect(scores).toContain('method: "POST"');
+    expect(scores).toContain("resolveAssessment.mutate()");
+    expect(scores).toContain("queryKeys.scoreSaveFeedback(sessionId)");
+    expect(scores).toContain("void invalidateScoreWorkflow(queryClient, teachingAssignmentId, sessionId)");
+    expect(scores).toContain("router.replace(`/sessions/${sessionId}?scoreSaved=1`)");
+    expect(scores).toContain("disabled={!isOnline || save.isPending || dirty.size === 0 || hasInvalidScore}");
+    expect(scores).toContain("saveRequested.current");
+    expect(scores).toContain("onPress={submitScores}");
+    expect(scores).toContain("setValues({})");
+    expect(scores).toContain("setDirty(new Set())");
+    expect(scores).toContain("onSuccess: () => {\n      saveRequested.current = false;");
+    const session = source("features/sessions/session-screen.tsx");
+    expect(session).toContain('scoreSavedParam === "1"');
+    expect(session).toContain("router.setParams({ scoreSaved: undefined })");
+    expect(session.indexOf('message="บันทึกคะแนนเรียบร้อยแล้ว"')).toBeLessThan(session.indexOf("<AppHeader"));
+    expect(session).toContain("useFocusEffect");
+    expect(session).toContain("queryKeys.scoreSaveFeedback(id)");
   });
 
   it("invalidates all session workflow query roots", async () => {

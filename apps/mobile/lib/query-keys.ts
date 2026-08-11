@@ -12,6 +12,7 @@ export const queryKeys = {
   attendanceSaveFeedback: (sessionId: string) => ["attendance-save-feedback", sessionId] as const,
   timeline: (sessionId: string) => ["timeline", sessionId] as const,
   gradebook: (teachingAssignmentId: string) => ["gradebook", teachingAssignmentId] as const,
+  scoreSaveFeedback: (sessionId: string) => ["score-save-feedback", sessionId] as const,
 };
 
 export async function invalidateScoreWorkflow(queryClient: QueryClient, teachingAssignmentId: string, sessionId?: string): Promise<void> {

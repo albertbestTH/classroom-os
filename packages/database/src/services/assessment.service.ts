@@ -106,6 +106,12 @@ export function createAssessment(
     const parsed = createAssessmentSchema.parse(input);
     return getPrismaClient().$transaction(async (transaction) => {
       if (parsed.classSessionId) {
+        // Serialize deterministic Quick Assessment resolution for one tenant/session.
+        // The second concurrent caller waits, then observes and returns the row
+        // created by the first caller instead of creating a duplicate.
+        await transaction.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${parsed.schoolId}), hashtext(${parsed.classSessionId}))`,
+        );
         const session = await requireClassSessionForSchool(transaction, {
           schoolId: parsed.schoolId,
           sessionId: parsed.classSessionId,
@@ -117,6 +123,10 @@ export function createAssessment(
             { currentStatus: session.status },
           );
         }
+        const existing = await transaction.assessment.findFirst({
+          where: { schoolId: parsed.schoolId, classSessionId: parsed.classSessionId },
+        });
+        if (existing) return toAssessmentResult(existing);
       }
 
       const assessment = await createAssessmentForSchool(transaction, {

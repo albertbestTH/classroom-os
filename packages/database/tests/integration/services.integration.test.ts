@@ -258,6 +258,38 @@ describe("tenant application services", () => {
     ).toBe(9);
   });
 
+  it("resolves concurrent Quick Assessment requests to one session assessment", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "quick-score-idempotency");
+    const session = await createClassSession({
+      schoolId: tenant.school.id,
+      timetableEntryId: tenant.timetableEntry.id,
+      scheduledStart: "2026-08-24T01:00:00.000Z",
+      scheduledEnd: "2026-08-24T01:50:00.000Z",
+    });
+    const input = {
+      schoolId: tenant.school.id,
+      actorUserId: tenant.user.id,
+      termId: tenant.term.id,
+      classroomId: tenant.classroom.id,
+      subjectId: tenant.subject.id,
+      teacherId: tenant.teacher.id,
+      classSessionId: session.id,
+      title: "Synthetic Quick Score",
+      type: "participation" as const,
+      maxScore: 10,
+    };
+
+    const [first, second] = await Promise.all([
+      createAssessment(input),
+      createAssessment(input),
+    ]);
+
+    expect(second.id).toBe(first.id);
+    expect(await prisma.assessment.count({
+      where: { schoolId: tenant.school.id, classSessionId: session.id },
+    })).toBe(1);
+  });
+
   it("detects teacher and classroom timetable overlaps", async () => {
     const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "overlap");
     const token = randomUUID().slice(0, 8);

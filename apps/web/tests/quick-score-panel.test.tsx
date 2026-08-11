@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuickScorePanel } from "@/components/classroom/quick-score-panel";
 import { parseScoreInput } from "@/lib/score-input";
 
+const { router } = vi.hoisted(() => ({ router: { refresh: vi.fn(), replace: vi.fn() } }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 const { requestApi } = vi.hoisted(() => ({ requestApi: vi.fn() }));
 vi.mock("@/lib/client-api", () => ({ requestApi, thaiApiError: () => "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง" }));
 
@@ -23,6 +26,7 @@ describe("Web Quick Score", () => {
 
   it("uses the exact session context and saves an explicit decimal score", async () => {
     requestApi.mockResolvedValue({});
+    router.replace.mockReset();
     render(<QuickScorePanel session={session} gradebook={gradebook} assessment={assessment} />);
     expect(screen.getByRole("link", { name: /กลับไป Live Class/ }).getAttribute("href")).toBe("/sessions/session-exact");
     fireEvent.change(screen.getByLabelText(/คะแนนของ สมชาย ใจดี/), { target: { value: "8.5" } });
@@ -31,6 +35,7 @@ describe("Web Quick Score", () => {
       method: "PUT", body: { classroomId: "class-exact", scores: [{ studentId: "student-1", value: 8.5 }] },
     }));
     await screen.findByRole("status");
+    expect(router.replace).toHaveBeenCalledWith("/sessions/session-exact?scoreSaved=1");
   });
 
   it("keeps invalid persisted values visible and retains input after a failed save", async () => {
