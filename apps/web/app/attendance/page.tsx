@@ -119,14 +119,33 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
 
       <section className="mt-8 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm" aria-labelledby="student-report-heading">
         <div className="p-5"><h2 id="student-report-heading" className="text-xl font-bold">รายนักเรียน</h2><p className="mt-1 text-sm text-[#6B7280]">นักเรียนคนเดียวกันจะแยกตามชั้นเรียนและวิชาเสมอ</p></div>
-        <div className="overflow-x-auto"><table className="min-w-[920px] w-full border-collapse text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">นักเรียน</th><th className="px-5 py-3">ชั้นเรียน</th><th className="px-5 py-3">วิชา</th><th className="px-5 py-3">คาบ</th><th className="px-5 py-3">สถานะ</th><th className="px-5 py-3 text-right">เข้าเรียน</th></tr></thead><tbody className="divide-y divide-slate-100">{report.students.map((student) => <tr key={`${student.studentId}-${student.classroomId}-${student.subjectId}`}><td className="px-5 py-4"><Link href={`/api/reports/attendance/students/${student.studentId}?${query}`} className="font-semibold text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">{student.studentName}</Link><p className="mt-1 font-mono text-xs text-slate-500">{student.studentNumber}</p></td><td className="px-5 py-4">{student.classroomName}</td><td className="px-5 py-4">{student.subjectName}</td><td className="px-5 py-4">{student.sessionCount}</td><td className="px-5 py-4"><Totals totals={student.totals} /></td><td className="px-5 py-4 text-right font-bold">{student.attendancePercentage.toFixed(2)}%</td></tr>)}</tbody></table>{report.students.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-500">ไม่พบข้อมูลตามตัวกรองนี้</p> : null}</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full border-collapse text-left text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr><th className="px-5 py-3">นักเรียน</th><th className="px-5 py-3">ชั้นเรียน</th><th className="px-5 py-3">วิชา</th><th className="px-5 py-3">คาบ</th><th className="px-5 py-3">สถานะ</th><th className="px-5 py-3 text-right">เข้าเรียน</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {report.students.map((student) => (
+                  <tr key={`${student.studentId}-${student.classroomId}-${student.subjectId}`}>
+                    <td className="px-5 py-4"><Link href={`/api/reports/attendance/students/${student.studentId}?${query}`} className="font-semibold text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">{student.studentName}</Link><p className="mt-1 font-mono text-xs text-slate-500">{student.studentNumber}</p></td>
+                    <td className="px-5 py-4">{student.classroomName}</td>
+                    <td className="px-5 py-4">{student.subjectName}</td>
+                    <td className="px-5 py-4">{student.sessionCount}</td>
+                    <td className="px-5 py-4"><Totals totals={student.totals} /></td>
+                    <td className="px-5 py-4 text-right font-bold">{student.attendancePercentage.toFixed(2)}%</td>
+                  </tr>
+              ))}
+            </tbody>
+          </table>
+          {report.students.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-500">ไม่พบข้อมูลตามตัวกรองนี้</p> : null}
+        </div>
+        <InlineScrollToTopButton />
       </section>
 
       <section className="mt-8 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm" aria-labelledby="session-report-heading">
         <div className="p-5"><h2 id="session-report-heading" className="text-xl font-bold">รายคาบเรียน</h2></div>
         <div className="overflow-x-auto"><table className="min-w-[900px] w-full border-collapse text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">วันและเวลา</th><th className="px-5 py-3">ชั้นเรียน / วิชา</th><th className="px-5 py-3">ครู</th><th className="px-5 py-3">สถานะคาบ</th><th className="px-5 py-3">ความครบถ้วน</th><th className="px-5 py-3 text-right">เข้าเรียน</th></tr></thead><tbody className="divide-y divide-slate-100">{report.sessions.map((session) => <tr key={session.sessionId}><td className="px-5 py-4"><Link href={`/sessions/${session.sessionId}/summary`} className="font-semibold text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">{new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: report.timezone }).format(new Date(session.scheduledStart))}</Link></td><td className="px-5 py-4">{session.classroomName}<p className="mt-1 text-xs text-slate-500">{session.subjectName}</p></td><td className="px-5 py-4">{session.teacherName}</td><td className="px-5 py-4"><StatusBadge variant={session.status === "completed" ? "success" : session.status === "cancelled" ? "warning" : session.status === "live" ? "info" : "neutral"}>{session.status}</StatusBadge></td><td className="px-5 py-4">{session.recordedCount}/{session.enrolledCount}</td><td className="px-5 py-4 text-right font-bold">{session.attendancePercentage.toFixed(2)}%</td></tr>)}</tbody></table></div>
       </section>
-      <InlineScrollToTopButton />
     </AppShell>
   );
 }

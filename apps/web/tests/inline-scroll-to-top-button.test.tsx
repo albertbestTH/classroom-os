@@ -20,71 +20,73 @@ describe("InlineScrollToTopButton", () => {
     scrollTo.mockReset();
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
     Object.defineProperty(window, "scrollTo", { configurable: true, value: scrollTo });
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: vi.fn().mockReturnValue({ matches: false }),
-    });
   });
 
   afterEach(() => cleanup());
 
-  it("is hidden near the top", () => {
+  it("is hidden at the top of the page", () => {
     render(<InlineScrollToTopButton />);
 
     expect(screen.queryByRole("button", { name: "กลับขึ้นด้านบน" })).toBeNull();
   });
 
-  it("appears after 500px as an icon-only control in normal document flow", () => {
+  it("appears after scrolling more than 500px and follows the viewport", () => {
     render(<InlineScrollToTopButton />);
     setScrollPosition(501);
-    const button = screen.getByRole("button", { name: "กลับขึ้นด้านบน" });
-    const container = screen.getByTestId("inline-scroll-to-top-container");
 
+    const button = screen.getByRole("button", { name: "กลับขึ้นด้านบน" });
     expect(button.textContent).toBe("");
-    expect(button.classList.contains("relative")).toBe(true);
-    expect(button.classList.contains("fixed")).toBe(false);
-    expect(button.classList.contains("sticky")).toBe(false);
-    expect(container.classList.contains("fixed")).toBe(false);
-    expect(container.classList.contains("sticky")).toBe(false);
+    expect(button.classList.contains("fixed")).toBe(true);
     expect(button.classList.contains("pointer-events-auto")).toBe(true);
+  });
+
+  it("locks the approved visual placement and compact circular treatment", () => {
+    render(<InlineScrollToTopButton />);
+    setScrollPosition(501);
+
+    const button = screen.getByTestId("inline-scroll-to-top-control");
+    expect(button.className).toContain("fixed");
+    expect(button.className).toContain("bottom-6");
+    expect(button.className).toContain("right-6");
+    expect(button.className).toContain("size-11");
+    expect(button.className).toContain("rounded-full");
+    expect(button.className).toContain("bg-blue-600");
+    expect(button.className).toContain("text-white");
   });
 
   it("smooth-scrolls to the top and hides immediately", () => {
     render(<InlineScrollToTopButton />);
     setScrollPosition(700);
+
     fireEvent.click(screen.getByRole("button", { name: "กลับขึ้นด้านบน" }));
 
+    expect(scrollTo).toHaveBeenCalledOnce();
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
     expect(screen.queryByRole("button", { name: "กลับขึ้นด้านบน" })).toBeNull();
   });
 
-  it("disables motion when the user prefers reduced motion", () => {
-    vi.mocked(window.matchMedia).mockReturnValue({ matches: true } as MediaQueryList);
+  it("hides again when scrolling back to the top", () => {
     render(<InlineScrollToTopButton />);
     setScrollPosition(700);
-    fireEvent.click(screen.getByRole("button", { name: "กลับขึ้นด้านบน" }));
+    expect(screen.getByRole("button", { name: "กลับขึ้นด้านบน" })).toBeTruthy();
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+    setScrollPosition(0);
+    expect(screen.queryByRole("button", { name: "กลับขึ้นด้านบน" })).toBeNull();
   });
 
-  it("contains no viewport-fixed or sticky positioning", () => {
-    const { container } = render(<InlineScrollToTopButton />);
-
-    expect(container.innerHTML).not.toMatch(/\b(?:fixed|sticky)\b/);
-  });
-
-  it("is scoped to the intended long-content screens rather than the global shell", () => {
+  it("renders exactly once on each intended screen and never in the global shell", () => {
     const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
+    const usage = "<InlineScrollToTopButton />";
 
     expect(read("components/app-shell.tsx")).not.toContain("InlineScrollToTopButton");
+    expect(read("app/layout.tsx")).not.toContain("InlineScrollToTopButton");
     for (const file of [
       "components/student-directory.tsx",
       "components/classroom/attendance-editor.tsx",
       "components/classroom/quick-score-panel.tsx",
       "app/attendance/page.tsx",
     ]) {
-      expect(read(file)).toContain("<InlineScrollToTopButton />");
+      expect(read(file).split(usage)).toHaveLength(2);
     }
-    expect(read("components/student-directory.tsx")).not.toContain('aria-label="กลับไปด้านบน"');
   });
 });

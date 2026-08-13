@@ -127,8 +127,9 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
       {gradebook.students.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">ไม่พบนักเรียนในห้องเรียนนี้</p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200">
+        <div>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-4 py-3 text-left">นักเรียน</th>
@@ -173,7 +174,9 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
+          <InlineScrollToTopButton />
         </div>
       )}
 
@@ -189,7 +192,6 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
       ) : null}
       {saved ? <p className="rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-800" role="status">บันทึกคะแนนเรียบร้อยแล้ว</p> : null}
       {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-red-800" role="alert">{error}</p> : null}
-      <InlineScrollToTopButton />
     </div>
   );
 }

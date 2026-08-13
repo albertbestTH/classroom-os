@@ -363,7 +363,7 @@ export function StudentDirectory() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
           <h2 id="student-list-heading" className="font-bold text-[#111827]">รายชื่อนักเรียน</h2>
           <p className="text-sm text-[#6B7280]">{filteredStudents.length} คน</p>
         </div>
@@ -431,9 +431,9 @@ export function StudentDirectory() {
               </div>
             ) : null}
           </div>
-        )}
+          )}
+        <InlineScrollToTopButton />
       </div>
-      <InlineScrollToTopButton />
       {importResult ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="student-import-result-title" aria-describedby="student-import-result-message">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
           {importResult.kind === "success"
