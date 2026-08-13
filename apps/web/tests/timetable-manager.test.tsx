@@ -25,8 +25,28 @@ const entry: TimetableEntryResult = {
 function success(data: TimetableEntryResult) { return Promise.resolve(new Response(JSON.stringify({ data }), { status: 200, headers: { "content-type": "application/json" } })); }
 
 describe("TimetableManager edit workflow", () => {
-  beforeEach(() => { refresh.mockReset(); vi.stubGlobal("fetch", vi.fn()); });
+  beforeEach(() => {
+    refresh.mockReset();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+  });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it("reveals the edit form and moves focus to its heading", async () => {
+    render(<TimetableManager entries={[entry]} assignments={[assignment]} role="ADMIN" />);
+
+    const editButton = document.querySelector<HTMLButtonElement>("article button[type='button']");
+    expect(editButton).not.toBeNull();
+    fireEvent.click(editButton!);
+
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" }));
+    const formTitle = document.querySelector<HTMLElement>("[id$='-form-title']");
+    expect(formTitle).not.toBeNull();
+    expect(document.activeElement).toBe(formTitle);
+  });
 
   it("prefills edit fields, PATCHes the record, and refreshes the visible card", async () => {
     vi.mocked(fetch).mockImplementation(async () => success({ ...entry, weekday: 4, startTime: "12:30", endTime: "13:20" }));

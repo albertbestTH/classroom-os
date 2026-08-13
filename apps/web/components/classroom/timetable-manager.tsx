@@ -20,6 +20,9 @@ export function TimetableManager({ entries, assignments, role }: { entries: Time
   const router = useRouter();
   const id = useId();
   const submitting = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const formTitleRef = useRef<HTMLHeadingElement>(null);
+  const revealEditForm = useRef(false);
   const [teacher, setTeacher] = useState("");
   const [classroom, setClassroom] = useState("");
   const [subject, setSubject] = useState("");
@@ -37,6 +40,19 @@ export function TimetableManager({ entries, assignments, role }: { entries: Time
     return () => window.clearTimeout(timer);
   }, [success]);
 
+  useEffect(() => {
+    if (!showForm || !revealEditForm.current) return;
+    revealEditForm.current = false;
+
+    const frame = window.requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      formRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      formTitleRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [showForm, editing]);
+
   const displayEntries = useMemo(() => sortEntries([...new Map([...entries, ...localEntries].map((entry) => [entry.id, entry])).values()]), [entries, localEntries]);
   const filtered = useMemo(() => displayEntries.filter((entry) =>
     (!teacher || entry.teacherId === teacher) && (!classroom || entry.classroomId === classroom) && (!subject || entry.subjectId === subject)),
@@ -49,6 +65,7 @@ export function TimetableManager({ entries, assignments, role }: { entries: Time
   function closeForm() { setShowForm(false); setEditing(null); setForm(emptyForm()); setError(null); }
   function openCreate() { setEditing(null); setForm(emptyForm()); setError(null); setSuccess(null); setShowForm(true); }
   function openEdit(entry: TimetableEntryResult) {
+    revealEditForm.current = true;
     setEditing(entry);
     setForm({ teachingAssignmentId: entry.teachingAssignmentId, weekday: entry.weekday, startTime: entry.startTime, endTime: entry.endTime, room: entry.room ?? "" });
     setError(null); setSuccess(null); setShowForm(true);
@@ -86,8 +103,8 @@ export function TimetableManager({ entries, assignments, role }: { entries: Time
     </div>
 
     {success ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status">{success}</p> : null}
-    {showForm ? <form onSubmit={submit} className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5" aria-labelledby={`${id}-form-title`}>
-      <div className="flex items-center justify-between gap-4"><div><h2 id={`${id}-form-title`} className="text-lg font-bold">{editing ? "แก้ไขคาบเรียน" : "เพิ่มคาบเรียน"}</h2>{editing ? <p className="mt-1 text-sm text-slate-600">กำลังแก้ไข {editing.subjectName} · {editing.classroomName}</p> : null}</div><button type="button" onClick={closeForm} disabled={pending} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60">{editing ? "ยกเลิกการแก้ไข" : "ยกเลิก"}</button></div>
+    {showForm ? <form ref={formRef} onSubmit={submit} className="scroll-mt-6 rounded-2xl border border-blue-200 bg-blue-50/40 p-5 lg:scroll-mt-8" aria-labelledby={`${id}-form-title`}>
+      <div className="flex items-center justify-between gap-4"><div><h2 ref={formTitleRef} id={`${id}-form-title`} tabIndex={-1} className="text-lg font-bold outline-none">{editing ? "แก้ไขคาบเรียน" : "เพิ่มคาบเรียน"}</h2>{editing ? <p className="mt-1 text-sm text-slate-600">กำลังแก้ไข {editing.subjectName} · {editing.classroomName}</p> : null}</div><button type="button" onClick={closeForm} disabled={pending} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60">{editing ? "ยกเลิกการแก้ไข" : "ยกเลิก"}</button></div>
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <label className="text-sm font-semibold xl:col-span-2">งานสอน<select aria-label="งานสอน" required disabled={Boolean(editing)} value={form.teachingAssignmentId} onChange={(event) => updateForm("teachingAssignmentId", event.target.value)} className={`${control} mt-2 disabled:bg-slate-100`}><option value="" disabled>เลือกห้องเรียนและวิชา</option>{assignments.map((item) => <option key={item.id} value={item.id}>{item.teacherName} · {item.classroomName} · {item.subjectName}</option>)}</select></label>
         <label className="text-sm font-semibold">วัน<select aria-label="วัน" value={form.weekday} onChange={(event) => updateForm("weekday", Number(event.target.value))} className={`${control} mt-2`}>{days.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select></label>
