@@ -72,7 +72,7 @@ export function AttendanceScreen({ sessionId, classroomId }: { sessionId: string
 
   if (roster.isLoading) return <LoadingSkeleton />;
   if (roster.error || !roster.data) return <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}><ErrorState error={roster.error} onRetry={() => void roster.refetch()} /></SafeAreaView>;
-  const data = roster.data; const readOnly = data.status !== "live"; const pickerStudent = data.students.find((student) => student.studentId === pickerStudentId); const returnToSession = () => router.replace(attendanceSessionPath(sessionId));
+  const data = roster.data; const readOnly = data.status === "completed" || data.status === "cancelled"; const pickerStudent = data.students.find((student) => student.studentId === pickerStudentId); const returnToSession = () => router.replace(attendanceSessionPath(sessionId));
 
   const header = <View style={styles.header}>
     <OfflineBanner visible={!isOnline} lastUpdated={roster.dataUpdatedAt} />

@@ -118,7 +118,7 @@ describe("operational classroom workflow", () => {
     expect(completed.status).toBe("completed");
     expect((await getClassSession({ schoolId: tenant.school.id, sessionId: sessionA.id })).status).toBe("completed");
     await expect(endClassSession({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, endedAt: "2099-07-20T01:21:00.000Z" })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
-    await expect(updateAttendanceBatch({ schoolId: tenant.school.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "late" }] })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
+    await expect(updateAttendanceBatch({ schoolId: tenant.school.id, actorUserId: tenant.user.id, sessionId: sessionA.id, records: [{ studentId: tenant.student.id, status: "late" }] })).rejects.toSatisfy((error) => hasCode(error, "INVALID_STATE_TRANSITION"));
     expect((await listClassSessionTimeline({ schoolId: tenant.school.id, sessionId: sessionA.id })).map((event) => event.eventType)).toEqual(["SESSION_STARTED", "ATTENDANCE_UPDATED", "SESSION_ENDED"]);
   });
 });
