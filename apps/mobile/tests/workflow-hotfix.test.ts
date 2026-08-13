@@ -22,6 +22,11 @@ describe("teacher workflow hotfix", () => {
     const successBlock = attendance.slice(attendance.indexOf("onSuccess"));
     expect(successBlock.indexOf("onSuccess")).toBeLessThan(successBlock.indexOf("router.replace(attendanceSessionPath(sessionId))"));
     expect(attendance).toContain("saveRequested.current");
+    expect(attendance).toContain("scrollToOffset({ offset: 0, animated: true })");
+    expect(attendance).toContain('accessibilityLabel="กลับขึ้นด้านบน"');
+    expect(attendance).toContain("ListFooterComponent={footer}");
+    expect(attendance).not.toContain('position: "fixed"');
+    expect(attendance).not.toContain('position: "sticky"');
   });
 
   it("keeps numeric keyboard and focus props on the native score input", () => {

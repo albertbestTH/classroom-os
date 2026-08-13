@@ -12,6 +12,7 @@ import type {
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
+import { InlineScrollToTopButton } from "@/components/inline-scroll-to-top-button";
 import { StatusBadge } from "@/components/status-badge";
 import { StudentRecordActions } from "@/components/student-record-actions";
 import { parseStudentCsv } from "@/lib/student-csv";
@@ -432,7 +433,7 @@ export function StudentDirectory() {
           </div>
         )}
       </div>
-      <button type="button" aria-label="กลับไปด้านบน" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="fixed bottom-6 right-6 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-xl text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">↑</button>
+      <InlineScrollToTopButton />
       {importResult ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="student-import-result-title" aria-describedby="student-import-result-message">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
           {importResult.kind === "success"

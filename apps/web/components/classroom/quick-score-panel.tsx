@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
+import { InlineScrollToTopButton } from "@/components/inline-scroll-to-top-button";
 import { requestApi, thaiApiError } from "@/lib/client-api";
 import { parseScoreInput } from "@/lib/score-input";
 
@@ -188,6 +189,7 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
       ) : null}
       {saved ? <p className="rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-800" role="status">บันทึกคะแนนเรียบร้อยแล้ว</p> : null}
       {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-red-800" role="alert">{error}</p> : null}
+      <InlineScrollToTopButton />
     </div>
   );
 }

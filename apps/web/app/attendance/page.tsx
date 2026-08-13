@@ -10,6 +10,7 @@ import type { AttendanceReportFilters, AttendanceStatusTotals } from "@classroom
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
+import { InlineScrollToTopButton } from "@/components/inline-scroll-to-top-button";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -125,6 +126,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
         <div className="p-5"><h2 id="session-report-heading" className="text-xl font-bold">รายคาบเรียน</h2></div>
         <div className="overflow-x-auto"><table className="min-w-[900px] w-full border-collapse text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">วันและเวลา</th><th className="px-5 py-3">ชั้นเรียน / วิชา</th><th className="px-5 py-3">ครู</th><th className="px-5 py-3">สถานะคาบ</th><th className="px-5 py-3">ความครบถ้วน</th><th className="px-5 py-3 text-right">เข้าเรียน</th></tr></thead><tbody className="divide-y divide-slate-100">{report.sessions.map((session) => <tr key={session.sessionId}><td className="px-5 py-4"><Link href={`/sessions/${session.sessionId}/summary`} className="font-semibold text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">{new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: report.timezone }).format(new Date(session.scheduledStart))}</Link></td><td className="px-5 py-4">{session.classroomName}<p className="mt-1 text-xs text-slate-500">{session.subjectName}</p></td><td className="px-5 py-4">{session.teacherName}</td><td className="px-5 py-4"><StatusBadge variant={session.status === "completed" ? "success" : session.status === "cancelled" ? "warning" : session.status === "live" ? "info" : "neutral"}>{session.status}</StatusBadge></td><td className="px-5 py-4">{session.recordedCount}/{session.enrolledCount}</td><td className="px-5 py-4 text-right font-bold">{session.attendancePercentage.toFixed(2)}%</td></tr>)}</tbody></table></div>
       </section>
+      <InlineScrollToTopButton />
     </AppShell>
   );
 }
