@@ -13,5 +13,34 @@ export default async function SessionSummaryPage({ params }: { params: Promise<{
   const { context } = await requireWebSession();
   await requireClassSessionAccess(context, id);
   const [session, roster, timeline] = await Promise.all([getClassSession({ schoolId: context.schoolId, sessionId: id }), getSessionAttendanceRoster({ schoolId: context.schoolId, sessionId: id }), listClassSessionTimeline({ schoolId: context.schoolId, sessionId: id })]);
-  return <AppShell><PageHeader eyebrow="สรุปคาบเรียน" title={`${session.subjectName} · ${session.classroomName}`} description={`${session.termName} · ${session.teacherName}`} action={<Link href={`/sessions/${id}`} aria-label="กลับไปหน้าคาบเรียน" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">← กลับไปหน้าคาบเรียน</Link>} /><div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]"><AttendanceDashboard summary={summarizeAttendance(roster)} /><SessionTimeline events={timeline} /></div></AppShell>;
+  return (
+    <AppShell>
+      <PageHeader
+        eyebrow="สรุปคาบเรียน"
+        title={`${session.subjectName} · ${session.classroomName}`}
+        description={`${session.termName} · ${session.teacherName}`}
+        action={(
+          <div className="flex flex-wrap justify-end gap-3">
+            <Link
+              href={`/sessions/${id}/scores`}
+              className="inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            >
+              กรอกคะแนนด่วน
+            </Link>
+            <Link
+              href={`/sessions/${id}`}
+              aria-label="กลับไปหน้าคาบเรียน"
+              className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            >
+              ← กลับไปหน้าคาบเรียน
+            </Link>
+          </div>
+        )}
+      />
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <AttendanceDashboard summary={summarizeAttendance(roster)} />
+        <SessionTimeline events={timeline} />
+      </div>
+    </AppShell>
+  );
 }

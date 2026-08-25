@@ -112,6 +112,12 @@ describe("database runtime foundation", () => {
 
   it("rejects duplicate score for a student and assessment", async () => {
     const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "score");
+    const category = await prisma.scoreCategory.create({ data: {
+      schoolId: tenant.school.id,
+      termId: tenant.term.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      name: "Synthetic raw scores",
+    } });
     const assessment = await prisma.assessment.create({
       data: {
         schoolId: tenant.school.id,
@@ -119,6 +125,8 @@ describe("database runtime foundation", () => {
         classroomId: tenant.classroom.id,
         subjectId: tenant.subject.id,
         teacherId: tenant.teacher.id,
+        teachingAssignmentId: tenant.teachingAssignment.id,
+        categoryId: category.id,
         title: "Synthetic Assessment",
         type: "quiz",
         maxScore: new Prisma.Decimal(10),

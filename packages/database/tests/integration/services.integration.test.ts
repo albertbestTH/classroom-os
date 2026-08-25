@@ -4,15 +4,20 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createAssessment,
+  createScoreCategory,
   createClassSession,
   createStudent,
   createTimetableEntry,
   endClassSession,
+  deleteAssessment,
+  deleteScoreCategory,
   getStudent,
   listStudents,
   reconcileExpiredClassSessions,
   startClassSession,
   updateAttendanceBatch,
+  updateAssessment,
+  updateScoreCategory,
   updateScoreBatch,
   updateStudent,
   type DomainError,
@@ -210,6 +215,7 @@ describe("tenant application services", () => {
 
   it("enforces score enrollment and assessment maximums", async () => {
     const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "score-service");
+    const category = await prisma.scoreCategory.create({ data: { schoolId: tenant.school.id, termId: tenant.term.id, teachingAssignmentId: tenant.teachingAssignment.id, name: "Quiz" } });
     const assessment = await createAssessment({
       schoolId: tenant.school.id,
       actorUserId: tenant.user.id,
@@ -217,9 +223,12 @@ describe("tenant application services", () => {
       classroomId: tenant.classroom.id,
       subjectId: tenant.subject.id,
       teacherId: tenant.teacher.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      categoryId: category.id,
       title: "Synthetic service quiz",
       type: "quiz",
       maxScore: 10,
+      assessmentDate: "2026-08-10",
     });
 
     const base = {
@@ -258,8 +267,118 @@ describe("tenant application services", () => {
     ).toBe(9);
   });
 
+  it("manages raw gradebook categories, assessments, null, zero, decimals, and isolation", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "raw-gradebook");
+    const other = await createSyntheticTenant(prisma, trackedSchoolIds, "raw-gradebook-other");
+    await prisma.classEnrollment.create({ data: {
+      schoolId: tenant.school.id, termId: tenant.term.id,
+      classroomId: tenant.classroom.id, studentId: tenant.student.id,
+    } });
+    const category = await createScoreCategory({
+      schoolId: tenant.school.id, actorUserId: tenant.user.id,
+      termId: tenant.term.id, teachingAssignmentId: tenant.teachingAssignment.id,
+      name: "แบบฝึกหัด",
+    });
+    const renamed = await updateScoreCategory({
+      schoolId: tenant.school.id, actorUserId: tenant.user.id,
+      categoryId: category.id, name: "งานในชั้นเรียน",
+    });
+    expect(renamed.name).toBe("งานในชั้นเรียน");
+    await expect(updateScoreCategory({
+      schoolId: other.school.id, actorUserId: other.user.id,
+      categoryId: category.id, name: "Cross tenant",
+    })).rejects.toSatisfy((error) => expectDomainCode(error, "NOT_FOUND"));
+
+    const assessment = await createAssessment({
+      schoolId: tenant.school.id, actorUserId: tenant.user.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      termId: tenant.term.id, classroomId: tenant.classroom.id,
+      subjectId: tenant.subject.id, teacherId: tenant.teacher.id,
+      categoryId: category.id, title: "ใบงาน 1", type: "homework",
+      maxScore: 10, assessmentDate: "2026-08-13",
+    });
+    const updated = await updateAssessment({
+      schoolId: tenant.school.id, actorUserId: tenant.user.id,
+      assessmentId: assessment.id, title: "ใบงาน 1 (แก้ไข)", maxScore: 12.5,
+    });
+    expect(updated).toMatchObject({ title: "ใบงาน 1 (แก้ไข)", maxScore: 12.5 });
+
+    await updateScoreBatch({
+      schoolId: tenant.school.id, assessmentId: assessment.id,
+      gradedById: tenant.teacher.id,
+      scores: [{ studentId: tenant.student.id, value: 0 }],
+    });
+    expect((await prisma.score.findUniqueOrThrow({ where: { assessmentId_studentId: { assessmentId: assessment.id, studentId: tenant.student.id } } })).value.toNumber()).toBe(0);
+    await updateScoreBatch({
+      schoolId: tenant.school.id, assessmentId: assessment.id,
+      gradedById: tenant.teacher.id,
+      scores: [{ studentId: tenant.student.id, value: 8.25 }],
+    });
+    expect((await prisma.score.findUniqueOrThrow({ where: { assessmentId_studentId: { assessmentId: assessment.id, studentId: tenant.student.id } } })).value.toNumber()).toBe(8.25);
+    expect(await prisma.score.count({ where: { assessmentId: assessment.id, studentId: tenant.student.id } })).toBe(1);
+    await updateScoreBatch({
+      schoolId: tenant.school.id, assessmentId: assessment.id,
+      gradedById: tenant.teacher.id,
+      scores: [{ studentId: tenant.student.id, value: null }],
+    });
+    expect(await prisma.score.findUnique({ where: { assessmentId_studentId: { assessmentId: assessment.id, studentId: tenant.student.id } } })).toBeNull();
+    await deleteAssessment({ schoolId: tenant.school.id, actorUserId: tenant.user.id, assessmentId: assessment.id });
+    await deleteScoreCategory({ schoolId: tenant.school.id, actorUserId: tenant.user.id, categoryId: category.id });
+    expect(await prisma.scoreCategory.findUnique({ where: { id: category.id } })).toBeNull();
+  });
+
+  it("allows quick scores after a session is completed but blocks cancelled sessions", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "completed-quick-score");
+    const category = await prisma.scoreCategory.create({ data: { schoolId: tenant.school.id, termId: tenant.term.id, teachingAssignmentId: tenant.teachingAssignment.id, name: "Quick Score" } });
+    await prisma.classEnrollment.create({ data: {
+      schoolId: tenant.school.id,
+      termId: tenant.term.id,
+      classroomId: tenant.classroom.id,
+      studentId: tenant.student.id,
+    } });
+    const completedSession = await createClassSession({
+      schoolId: tenant.school.id,
+      timetableEntryId: tenant.timetableEntry.id,
+      scheduledStart: "2026-08-24T01:00:00.000Z",
+      scheduledEnd: "2026-08-24T01:50:00.000Z",
+    });
+    await startClassSession({ schoolId: tenant.school.id, sessionId: completedSession.id, startedAt: "2026-08-24T01:00:00.000Z" });
+    await endClassSession({ schoolId: tenant.school.id, sessionId: completedSession.id, endedAt: "2026-08-24T01:50:00.000Z" });
+    const assessment = await createAssessment({
+      schoolId: tenant.school.id,
+      actorUserId: tenant.user.id,
+      termId: tenant.term.id,
+      classroomId: tenant.classroom.id,
+      subjectId: tenant.subject.id,
+      teacherId: tenant.teacher.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      categoryId: category.id,
+      classSessionId: completedSession.id,
+      title: "Synthetic completed quick score",
+      type: "participation",
+      maxScore: 10,
+      assessmentDate: "2026-08-24",
+    });
+    await expect(updateScoreBatch({
+      schoolId: tenant.school.id,
+      actorUserId: tenant.user.id,
+      assessmentId: assessment.id,
+      gradedById: tenant.teacher.id,
+      scores: [{ studentId: tenant.student.id, value: 8.5 }],
+    })).resolves.toMatchObject({ count: 1, records: [{ value: 8.5 }] });
+
+    await prisma.classSession.update({ where: { id: completedSession.id }, data: { status: "cancelled" } });
+    await expect(updateScoreBatch({
+      schoolId: tenant.school.id,
+      assessmentId: assessment.id,
+      gradedById: tenant.teacher.id,
+      scores: [{ studentId: tenant.student.id, value: 9 }],
+    })).rejects.toSatisfy((error) => expectDomainCode(error, "INVALID_STATE_TRANSITION"));
+  });
+
   it("resolves concurrent Quick Assessment requests to one session assessment", async () => {
     const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "quick-score-idempotency");
+    const category = await prisma.scoreCategory.create({ data: { schoolId: tenant.school.id, termId: tenant.term.id, teachingAssignmentId: tenant.teachingAssignment.id, name: "Quick Score" } });
     const session = await createClassSession({
       schoolId: tenant.school.id,
       timetableEntryId: tenant.timetableEntry.id,
@@ -273,10 +392,13 @@ describe("tenant application services", () => {
       classroomId: tenant.classroom.id,
       subjectId: tenant.subject.id,
       teacherId: tenant.teacher.id,
+      teachingAssignmentId: tenant.teachingAssignment.id,
+      categoryId: category.id,
       classSessionId: session.id,
       title: "Synthetic Quick Score",
       type: "participation" as const,
       maxScore: 10,
+      assessmentDate: "2026-08-24",
     };
 
     const [first, second] = await Promise.all([

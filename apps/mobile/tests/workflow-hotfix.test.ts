@@ -59,6 +59,17 @@ describe("teacher workflow hotfix", () => {
     expect(session).toContain("queryKeys.scoreSaveFeedback(id)");
   });
 
+  it("allows score entry after a completed session on mobile", () => {
+    const scores = source("features/scores/quick-score-screen.tsx");
+    const session = source("features/sessions/session-screen.tsx");
+    const summary = source("app/sessions/[id]/summary.tsx");
+
+    expect(scores).toContain('const readOnly = session.data?.status === "cancelled"');
+    expect(session).toContain('data.status === "live" || data.status === "completed"');
+    expect(summary).toContain('session.data.status === "completed"');
+    expect(summary).toContain("/scores?teachingAssignmentId=");
+  });
+
   it("invalidates all session workflow query roots", async () => {
     const invalidated: unknown[][] = [];
     const client = { invalidateQueries: jest.fn(({ queryKey }) => { invalidated.push(queryKey); return Promise.resolve(); }) };

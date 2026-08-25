@@ -213,3 +213,21 @@ export async function requireTeachingAssignmentForSchool(
   if (!assignment) throw new TenantRecordNotFoundError("Teaching assignment");
   return assignment;
 }
+
+export async function deleteTeachingAssignmentForSchool(
+  client: AccountClient,
+  input: TenantScope & { teachingAssignmentId: string },
+) {
+  const schoolId = requireSchoolId(input);
+  const id = requireRecordId(input.teachingAssignmentId, "teachingAssignmentId");
+  const assignment = await client.teachingAssignment.findUnique({
+    where: { id, schoolId },
+    include: { _count: { select: { timetableEntries: true, classSessions: true } } },
+  });
+  if (!assignment) throw new TenantRecordNotFoundError("Teaching assignment");
+  if (assignment._count.timetableEntries > 0 || assignment._count.classSessions > 0) {
+    throw new Error("Teaching assignment has timetable or historical sessions.");
+  }
+  await client.teachingAssignment.delete({ where: { id, schoolId } });
+  return assignment;
+}

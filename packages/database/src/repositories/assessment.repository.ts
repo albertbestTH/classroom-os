@@ -3,6 +3,7 @@ import type {
   Prisma,
   PrismaClient,
   Score,
+  ScoreCategory,
 } from "../generated/prisma/client.js";
 import {
   requireRecordId,
@@ -17,6 +18,7 @@ import { requireTenantReferencesForSchool } from "./reference.repository.js";
 type AssessmentClient = Pick<
   PrismaClient,
   | "assessment"
+  | "scoreCategory"
   | "authSession"
   | "score"
   | "attendanceRecord"
@@ -42,6 +44,17 @@ export async function requireAssessmentForSchool(
   return assessment;
 }
 
+export async function requireScoreCategoryForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { categoryId: string },
+): Promise<ScoreCategory> {
+  const schoolId = requireSchoolId(input);
+  const id = requireRecordId(input.categoryId, "categoryId");
+  const category = await client.scoreCategory.findUnique({ where: { id, schoolId } });
+  if (!category) throw new TenantRecordNotFoundError("Score category");
+  return category;
+}
+
 export async function getGradebookDataForSchool(
   client: AssessmentClient,
   input: TenantScope & { teachingAssignmentId: string },
@@ -55,17 +68,18 @@ export async function getGradebookDataForSchool(
     schoolId,
     teachingAssignmentId,
   });
-  const [assessments, enrollments] = await Promise.all([
+  const [categories, assessments, enrollments] = await Promise.all([
+    client.scoreCategory.findMany({
+      where: { schoolId, teachingAssignmentId },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    }),
     client.assessment.findMany({
       where: {
         schoolId,
-        termId: assignment.termId,
-        classroomId: assignment.classroomId,
-        subjectId: assignment.subjectId,
-        teacherId: assignment.teacherId,
+        teachingAssignmentId,
       },
       include: { scores: { orderBy: { studentId: "asc" } } },
-      orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      orderBy: [{ assessmentDate: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     }),
     client.classEnrollment.findMany({
       where: {
@@ -83,7 +97,61 @@ export async function getGradebookDataForSchool(
       ],
     }),
   ]);
-  return { assignment, assessments, enrollments };
+  return { assignment, categories, assessments, enrollments };
+}
+
+export function createScoreCategoryForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { termId: string; teachingAssignmentId: string; name: string },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.scoreCategory.create({
+    data: {
+      schoolId,
+      termId: input.termId,
+      teachingAssignmentId: input.teachingAssignmentId,
+      name: input.name,
+    },
+  });
+}
+
+export function upsertScoreCategoryForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { termId: string; teachingAssignmentId: string; name: string },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.scoreCategory.upsert({
+    where: {
+      schoolId_teachingAssignmentId_name: {
+        schoolId,
+        teachingAssignmentId: input.teachingAssignmentId,
+        name: input.name,
+      },
+    },
+    create: { schoolId, termId: input.termId, teachingAssignmentId: input.teachingAssignmentId, name: input.name },
+    update: {},
+  });
+}
+
+export function updateScoreCategoryForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { categoryId: string; name: string },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.scoreCategory.update({
+    where: { id: requireRecordId(input.categoryId, "categoryId"), schoolId },
+    data: { name: input.name },
+  });
+}
+
+export function deleteScoreCategoryForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { categoryId: string },
+) {
+  const schoolId = requireSchoolId(input);
+  return client.scoreCategory.delete({
+    where: { id: requireRecordId(input.categoryId, "categoryId"), schoolId },
+  });
 }
 
 export async function createAssessmentForSchool(
@@ -127,6 +195,36 @@ export async function createAssessmentForSchool(
   return client.assessment.create({ data: { schoolId, ...input.data } });
 }
 
+export function updateAssessmentForSchool(
+  client: AssessmentClient,
+  input: TenantScope & {
+    assessmentId: string;
+    data: Pick<Prisma.AssessmentUpdateInput, "title" | "maxScore" | "assessmentDate"> & {
+      categoryId?: string;
+    };
+  },
+) {
+  const schoolId = requireSchoolId(input);
+  const { categoryId, ...data } = input.data;
+  return client.assessment.update({
+    where: { id: requireRecordId(input.assessmentId, "assessmentId"), schoolId },
+    data: {
+      ...data,
+      ...(categoryId ? { category: { connect: { id: categoryId } } } : {}),
+    },
+  });
+}
+
+export async function deleteAssessmentForSchool(
+  client: AssessmentClient,
+  input: TenantScope & { assessmentId: string },
+) {
+  const schoolId = requireSchoolId(input);
+  const assessmentId = requireRecordId(input.assessmentId, "assessmentId");
+  await client.score.deleteMany({ where: { schoolId, assessmentId } });
+  return client.assessment.delete({ where: { id: assessmentId, schoolId } });
+}
+
 export async function findUnenrolledScoreStudentIdsForSchool(
   client: AssessmentClient,
   input: TenantScope & {
@@ -149,7 +247,7 @@ export async function upsertScoreBatchForSchool(
     gradedById?: string | null;
     scores: ReadonlyArray<{
       studentId: string;
-      value: Prisma.Decimal;
+      value: Prisma.Decimal | null;
       feedback?: string | null;
     }>;
   },
@@ -167,6 +265,10 @@ export async function upsertScoreBatchForSchool(
 
   const scores: Score[] = [];
   for (const { studentId, value, feedback } of input.scores) {
+    if (value === null) {
+      await client.score.deleteMany({ where: { schoolId, assessmentId, studentId } });
+      continue;
+    }
     scores.push(
       await client.score.upsert({
         where: { assessmentId_studentId: { assessmentId, studentId } },

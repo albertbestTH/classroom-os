@@ -41,7 +41,7 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
     Boolean(teachingAssignmentId),
   );
   const existingAssessment = gradebook.data?.assessments.find((item) => item.classSessionId === sessionId) ?? null;
-  const readOnly = session.data?.status === "completed" || session.data?.status === "cancelled";
+  const readOnly = session.data?.status === "cancelled";
 
   const resolveAssessment = useMutation({
     mutationFn: () => apiRequest<AssessmentResult>("/api/assessments", {
@@ -82,10 +82,10 @@ export function QuickScoreScreen({ sessionId, teachingAssignmentId, classroomId 
       token,
       body: {
         classroomId,
-        scores: [...dirty].flatMap((studentId) => {
+        scores: [...dirty].map((studentId): { studentId: string; value: number | null } => {
           const parsed = parseScoreInput(scoreValue(studentId), assessment!.maxScore);
           if (parsed.kind === "invalid") throw new Error(parsed.message);
-          return parsed.kind === "empty" ? [] : [{ studentId, value: parsed.value }];
+          return parsed.kind === "empty" ? { studentId, value: null } : { studentId, value: parsed.value };
         }),
       },
     }),

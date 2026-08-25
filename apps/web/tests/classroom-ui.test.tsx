@@ -47,4 +47,30 @@ describe("operational classroom states", () => {
     ]);
     expect(classes[0]?.timetableEntry.id).toBe("period-3");
   });
+
+  it("links a materialized timetable subject to its exact session summary", () => {
+    const markup = renderToStaticMarkup(<TodaySchedule today={{
+      localDate: "2026-08-13",
+      timezone: "Asia/Bangkok",
+      classes: [{
+        status: "completed",
+        scheduledStart: "2026-08-13T01:30:00.000Z",
+        scheduledEnd: "2026-08-13T02:20:00.000Z",
+        coverage: null,
+        timetableEntry: {
+          id: "timetable-exact",
+          startTime: "08:30",
+          endTime: "09:20",
+          subjectName: "คณิตศาสตร์",
+          classroomName: "ม.2/1",
+          room: "210",
+        },
+        session: { id: "session-exact", enrolledStudentCount: 30 },
+      }],
+      nextClass: null,
+    } as never} />);
+
+    expect(markup).toContain('href="/sessions/session-exact/summary"');
+    expect(markup).toContain("ดูสรุปคาบเรียน คณิตศาสตร์ ม.2/1");
+  });
 });

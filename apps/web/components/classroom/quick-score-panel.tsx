@@ -30,7 +30,7 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const readOnly = session.status === "completed" || session.status === "cancelled";
+  const readOnly = session.status === "cancelled";
   const validations = assessment
     ? Object.fromEntries(
         gradebook.students.map((student) => [
@@ -71,9 +71,9 @@ export function QuickScorePanel({ session, gradebook, assessment }: QuickScorePa
     setError(null);
     setSaved(false);
     try {
-      const scores = [...changed].flatMap((studentId) => {
+      const scores = [...changed].map((studentId): { studentId: string; value: number | null } => {
         const parsed = parseScoreInput(values[studentId] ?? "", assessment.maxScore);
-        return parsed.kind === "valid" ? [{ studentId, value: parsed.value }] : [];
+        return parsed.kind === "valid" ? { studentId, value: parsed.value } : { studentId, value: null };
       });
       if (scores.length) {
         await requestApi(`/api/assessments/${assessment.id}/scores`, {

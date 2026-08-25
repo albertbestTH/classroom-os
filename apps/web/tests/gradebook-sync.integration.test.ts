@@ -73,7 +73,7 @@ describe("mobile and web gradebook synchronization", () => {
 
     const update = await putScores(request(`/api/assessments/${assessmentId}/scores`, {
       bearer: mobile.data.token, method: "PUT",
-      json: { classroomId: tenant.classroom.id, scores: [{ studentId: tenant.student.id, value: 8 }] },
+      json: { classroomId: tenant.classroom.id, scores: [{ studentId: tenant.student.id, value: 0 }] },
     }), { params: Promise.resolve({ id: assessmentId }) });
     expect(update.status).toBe(200);
 
@@ -81,7 +81,7 @@ describe("mobile and web gradebook synchronization", () => {
     const webView = await getGradebook(request(exactGradebookPath, { cookie: web.token }));
     expect(webView.status).toBe(200);
     const webPayload = await webView.json();
-    expect(webPayload).toMatchObject({ data: { students: [{ studentId: tenant.student.id, scores: [{ assessmentId, value: 8 }] }] } });
+    expect(webPayload).toMatchObject({ data: { categories: [{ name: "คะแนนด่วน" }], students: [{ studentId: tenant.student.id, scores: [{ assessmentId, value: 0 }] }] } });
 
     const webUpdate = await putScores(request(`/api/assessments/${assessmentId}/scores`, {
       cookie: web.token, method: "PUT",
@@ -93,7 +93,14 @@ describe("mobile and web gradebook synchronization", () => {
     expect(mobileView.status).toBe(200);
     const mobilePayload = await mobileView.json();
     expect(mobilePayload).toMatchObject({ data: { students: [{ studentId: tenant.student.id, scores: [{ assessmentId, value: 9.5 }] }] } });
+    const clear = await putScores(request(`/api/assessments/${assessmentId}/scores`, {
+      cookie: web.token, method: "PUT",
+      json: { classroomId: tenant.classroom.id, scores: [{ studentId: tenant.student.id, value: null }] },
+    }), { params: Promise.resolve({ id: assessmentId }) });
+    expect(clear.status).toBe(200);
+    const clearedMobileView = await getGradebook(request(exactGradebookPath, { bearer: mobile.data.token }));
+    expect(await clearedMobileView.json()).toMatchObject({ data: { students: [{ scores: [{ assessmentId, value: null }] }] } });
     expect(await prisma.assessment.count({ where: { schoolId: tenant.school.id, classSessionId: session.id } })).toBe(1);
-    expect(await prisma.score.count({ where: { assessmentId, studentId: tenant.student.id } })).toBe(1);
+    expect(await prisma.score.count({ where: { assessmentId, studentId: tenant.student.id } })).toBe(0);
   });
 });

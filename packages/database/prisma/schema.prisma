@@ -101,6 +101,7 @@ model School {
   classSessions         ClassSession[]
   attendanceRecords     AttendanceRecord[]
   assessments           Assessment[]
+  scoreCategories       ScoreCategory[]
   scores                Score[]
   auditLogs             AuditLog[]
   authSessions          AuthSession[]
@@ -168,6 +169,7 @@ model Term {
   timetableEntries    TimetableEntry[]
   classSessions       ClassSession[]
   assessments         Assessment[]
+  scoreCategories     ScoreCategory[]
 
   @@unique([academicYearId, name])
   @@index([schoolId, isCurrent])
@@ -433,6 +435,8 @@ model TeachingAssignment {
   subject          Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   timetableEntries TimetableEntry[]
   classSessions    ClassSession[]
+  assessments      Assessment[]
+  scoreCategories  ScoreCategory[]
 
   @@unique([schoolId, termId, teacherId, classroomId, subjectId])
   @@index([schoolId, termId, teacherId])
@@ -615,31 +619,56 @@ model AttendanceCorrection {
 }
 
 model Assessment {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId       String         @db.Uuid
-  termId         String         @db.Uuid
-  classroomId    String         @db.Uuid
-  subjectId      String         @db.Uuid
-  teacherId      String         @db.Uuid
-  classSessionId String?        @db.Uuid
-  title          String
-  type           AssessmentType
-  maxScore       Decimal        @db.Decimal(7, 2)
-  dueAt          DateTime?      @db.Timestamptz(3)
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId             String         @db.Uuid
+  termId               String         @db.Uuid
+  classroomId          String         @db.Uuid
+  subjectId            String         @db.Uuid
+  teacherId            String         @db.Uuid
+  teachingAssignmentId String         @db.Uuid
+  categoryId           String         @db.Uuid
+  classSessionId       String?        @db.Uuid
+  title                String
+  type                 AssessmentType
+  maxScore             Decimal        @db.Decimal(7, 2)
+  assessmentDate       DateTime       @default(now()) @db.Date
+  dueAt                DateTime?      @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
 
-  school       School        @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  term         Term          @relation(fields: [termId], references: [id], onDelete: Restrict)
-  classroom    Classroom     @relation(fields: [classroomId], references: [id], onDelete: Restrict)
-  subject      Subject       @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  teacher      Teacher       @relation("AssessmentTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
-  classSession ClassSession? @relation(fields: [classSessionId], references: [id], onDelete: SetNull)
-  scores       Score[]
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term               Term               @relation(fields: [termId], references: [id], onDelete: Restrict)
+  classroom          Classroom          @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  subject            Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher            Teacher            @relation("AssessmentTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  teachingAssignment TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
+  category           ScoreCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  classSession       ClassSession?      @relation(fields: [classSessionId], references: [id], onDelete: SetNull)
+  scores             Score[]
 
   @@index([schoolId, termId, classroomId, subjectId])
+  @@index([schoolId, teachingAssignmentId, assessmentDate])
+  @@index([schoolId, categoryId, assessmentDate])
   @@index([schoolId, teacherId, createdAt])
   @@index([classSessionId])
+}
+
+model ScoreCategory {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId             String   @db.Uuid
+  termId               String   @db.Uuid
+  teachingAssignmentId String   @db.Uuid
+  name                 String
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  term               Term               @relation(fields: [termId], references: [id], onDelete: Restrict)
+  teachingAssignment TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Restrict)
+  assessments        Assessment[]
+
+  @@unique([schoolId, teachingAssignmentId, name])
+  @@index([schoolId, termId, teachingAssignmentId])
 }
 
 model Score {

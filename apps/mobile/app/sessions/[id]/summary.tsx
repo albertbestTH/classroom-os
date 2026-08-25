@@ -49,8 +49,8 @@ export default function SummaryScreen() {
       {needsFollowUp > 0 ? <Text style={[styles.followUp, { color: themeColors.warning }]}>ควรติดตามนักเรียนที่ขาดหรือลา {needsFollowUp} คน</Text> : <Text style={[styles.complete, { color: themeColors.success }]}>นักเรียนทุกคนมาเรียนหรือมาสาย</Text>}
     </Card>
 
-    <AppButton label="กลับไปหน้าวันนี้" onPress={() => router.replace("/(tabs)")} />
-    <AppButton label="ไปตารางสอน" tone="secondary" onPress={() => router.replace("/(tabs)/classes")} />
+    {session.data.status === "completed" ? <AppButton label="กรอกคะแนนด่วน" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${session.data!.teachingAssignmentId}&classroomId=${session.data!.classroomId}`)} /> : null}
+
   </SafeScreen>;
 }
 

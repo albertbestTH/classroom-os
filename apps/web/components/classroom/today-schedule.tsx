@@ -60,13 +60,29 @@ export function TodaySchedule({ today }: { today: TodayTimetableResult }) {
                 <span className="text-xs font-semibold text-slate-600">
                   {item.timetableEntry.startTime}–{item.timetableEntry.endTime}
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-slate-900">{item.timetableEntry.subjectName}</span>
-                  <span className="mt-0.5 block truncate text-xs text-slate-500">
-                    {item.timetableEntry.classroomName} · ห้อง {item.timetableEntry.room ?? "—"}
-                    {count !== undefined ? ` · ${count} คน` : ""}
+                {item.session ? (
+                  <Link
+                    href={`/sessions/${item.session.id}/summary`}
+                    aria-label={`ดูสรุปคาบเรียน ${item.timetableEntry.subjectName} ${item.timetableEntry.classroomName}`}
+                    className="group min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                  >
+                    <span className="block truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-blue-700">
+                      {item.timetableEntry.subjectName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.timetableEntry.classroomName} · ห้อง {item.timetableEntry.room ?? "—"}
+                      {count !== undefined ? ` · ${count} คน` : ""}
+                    </span>
+                  </Link>
+                ) : (
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-900">{item.timetableEntry.subjectName}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.timetableEntry.classroomName} · ห้อง {item.timetableEntry.room ?? "—"}
+                      {count !== undefined ? ` · ${count} คน` : ""}
+                    </span>
                   </span>
-                </span>
+                )}
                 <span className="flex items-center gap-2">
                   <StatusBadge variant={item.status === "completed" ? "success" : item.status === "live" ? "info" : item.status === "missed" || item.status === "cancelled" ? "warning" : "neutral"}>
                     {labels[item.status]}

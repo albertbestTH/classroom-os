@@ -38,6 +38,13 @@ describe("Web Quick Score", () => {
     expect(router.replace).toHaveBeenCalledWith("/sessions/session-exact?scoreSaved=1");
   });
 
+  it("keeps score entry enabled after the session is completed", () => {
+    render(<QuickScorePanel session={{ ...session, status: "completed" } as never} gradebook={gradebook} assessment={assessment} />);
+
+    expect(screen.getByLabelText(/คะแนนของ สมชาย ใจดี/)).not.toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: /บันทึกคะแนน/ })).toBeTruthy();
+  });
+
   it("keeps invalid persisted values visible and retains input after a failed save", async () => {
     const invalidGradebook = { ...gradebook, students: [{ ...gradebook.students[0], scores: [{ assessmentId: "assessment-exact", value: 12 }] }] } as never;
     const view = render(<QuickScorePanel session={session} gradebook={invalidGradebook} assessment={assessment} />);

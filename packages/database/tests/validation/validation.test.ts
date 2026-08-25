@@ -142,13 +142,16 @@ describe("service validation schemas", () => {
     expect(() =>
       createAssessmentSchema.parse({
         schoolId,
+        teachingAssignmentId: randomUUID(),
         termId: randomUUID(),
         classroomId: randomUUID(),
         subjectId: randomUUID(),
         teacherId: randomUUID(),
+        categoryId: randomUUID(),
         title: "Synthetic quiz",
         type: "quiz",
         maxScore: 0,
+        assessmentDate: "2026-08-13",
       }),
     ).toThrow();
   });
@@ -171,6 +174,18 @@ describe("service validation schemas", () => {
         scores: [{ studentId, value: -1 }],
       }),
     ).toThrow();
+  });
+
+  it("preserves raw score null, zero, and decimal values", () => {
+    expect(updateScoreBatchSchema.parse({
+      schoolId,
+      assessmentId: randomUUID(),
+      scores: [
+        { studentId: randomUUID(), value: null },
+        { studentId: randomUUID(), value: 0 },
+        { studentId: randomUUID(), value: 8.5 },
+      ],
+    }).scores.map(({ value }) => value)).toEqual([null, 0, 8.5]);
   });
 
   it("requires bounded correction and cancellation reasons and ordered report dates", () => {

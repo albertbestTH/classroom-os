@@ -117,6 +117,11 @@ export interface MobileSessionResult {
   user: CurrentUserResult;
 }
 
+export interface MobileSessionValidationResult {
+  expiresAt: string;
+  user: CurrentUserResult;
+}
+
 export type ApiErrorCode =
   | AuthErrorCode
   | DomainErrorCode
@@ -430,20 +435,42 @@ export interface CorrectAttendanceInput extends TenantServiceInput {
 }
 
 export interface CreateAssessmentInput extends TenantServiceInput {
+  teachingAssignmentId: string;
   termId: string;
   classroomId: string;
   subjectId: string;
   teacherId: string;
+  categoryId: string;
   classSessionId?: string | null;
   title: string;
   type: AssessmentType;
   maxScore: number;
+  assessmentDate: string;
   dueAt?: string | null;
+}
+
+export interface UpdateAssessmentInput extends TenantServiceInput {
+  assessmentId: string;
+  title?: string;
+  categoryId?: string;
+  maxScore?: number;
+  assessmentDate?: string;
+}
+
+export interface CreateScoreCategoryInput extends TenantServiceInput {
+  teachingAssignmentId: string;
+  termId: string;
+  name: string;
+}
+
+export interface UpdateScoreCategoryInput extends TenantServiceInput {
+  categoryId: string;
+  name: string;
 }
 
 export interface ScoreBatchItem {
   studentId: string;
-  value: number;
+  value: number | null;
   feedback?: string | null;
 }
 
@@ -895,11 +922,22 @@ export interface AssessmentResult {
   classroomId: string;
   subjectId: string;
   teacherId: string;
+  teachingAssignmentId: string;
+  categoryId: string;
   classSessionId: string | null;
   title: string;
   type: AssessmentType;
   maxScore: number;
+  assessmentDate: string;
   dueAt: string | null;
+}
+
+export interface ScoreCategoryResult {
+  id: string;
+  schoolId: string;
+  termId: string;
+  teachingAssignmentId: string;
+  name: string;
 }
 
 export interface ScoreResult {
@@ -930,16 +968,13 @@ export interface GradebookStudentResult {
   preferredName: string | null;
   profileImageKey: string | null;
   scores: GradebookStudentScoreResult[];
-  earnedScore: number;
-  gradedMaxScore: number;
-  percentage: number | null;
 }
 
 export interface GradebookResult {
   teachingContext: TeachingContext;
+  categories: ScoreCategoryResult[];
   assessments: GradebookAssessmentResult[];
   students: GradebookStudentResult[];
-  totalMaxScore: number;
 }
 
 export interface BatchServiceResult<T> {

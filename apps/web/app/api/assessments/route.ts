@@ -3,6 +3,7 @@ import {
   domainError,
   getClassSession,
   getGradebook,
+  getOrCreateDefaultScoreCategory,
   getTeachingAssignment,
   requireClassSessionAccess,
   trustedTenantInput,
@@ -56,16 +57,29 @@ export async function POST(request: NextRequest) {
       if (classSessionId) {
         await requireClassSessionAccess(context, classSessionId, assignment.classroomId);
       }
+      const requestedCategoryId = optionalNullableString(body, "categoryId");
+      const category = requestedCategoryId
+        ? { id: requestedCategoryId }
+        : await getOrCreateDefaultScoreCategory(trustedTenantInput(context, {
+            teachingAssignmentId,
+            termId: assignment.termId,
+            name: classSessionId ? "คะแนนด่วน" : "คะแนนทั่วไป",
+          }));
       return createAssessment(
         trustedTenantInput(context, {
+          teachingAssignmentId,
           termId: assignment.termId,
           classroomId: assignment.classroomId,
           subjectId: assignment.subjectId,
           teacherId: assignment.teacherId,
+          categoryId: category.id,
           classSessionId,
           title: requiredString(body, "title"),
           type: requiredString(body, "type") as AssessmentType,
           maxScore: requiredNumber(body, "maxScore"),
+          assessmentDate: optionalNullableString(body, "assessmentDate")
+            ?? session?.scheduledStart.slice(0, 10)
+            ?? new Date().toISOString().slice(0, 10),
           dueAt: optionalNullableString(body, "dueAt"),
         }),
       );

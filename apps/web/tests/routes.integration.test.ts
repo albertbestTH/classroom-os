@@ -313,6 +313,10 @@ describe("authenticated API routes", () => {
     });
     await expect(freshCompleted.json()).resolves.toMatchObject({ data: { status: "completed" } });
 
+    const categoryA = await prisma.scoreCategory.create({ data: {
+      schoolId: tenant.school.id, termId: tenant.term.id,
+      teachingAssignmentId: tenant.teachingAssignment.id, name: "Synthetic category A",
+    } });
     const assessmentA = await prisma.assessment.create({
       data: {
         schoolId: tenant.school.id,
@@ -320,6 +324,8 @@ describe("authenticated API routes", () => {
         classroomId: tenant.classroom.id,
         subjectId: tenant.subject.id,
         teacherId: tenant.teacher.id,
+        teachingAssignmentId: tenant.teachingAssignment.id,
+        categoryId: categoryA.id,
         title: "Synthetic assessment A",
         type: "quiz",
         maxScore: 10,

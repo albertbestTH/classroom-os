@@ -162,10 +162,13 @@ export function toAssessmentResult(assessment: Assessment): AssessmentResult {
     classroomId: assessment.classroomId,
     subjectId: assessment.subjectId,
     teacherId: assessment.teacherId,
+    teachingAssignmentId: assessment.teachingAssignmentId,
+    categoryId: assessment.categoryId,
     classSessionId: assessment.classSessionId,
     title: assessment.title,
     type: assessment.type,
     maxScore: assessment.maxScore.toNumber(),
+    assessmentDate: assessment.assessmentDate.toISOString().slice(0, 10),
     dueAt: assessment.dueAt?.toISOString() ?? null,
   };
 }

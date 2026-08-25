@@ -247,15 +247,44 @@ export const dashboardOverviewFiltersSchema = z.object({
 
 export const createAssessmentSchema = z.object({
   ...tenantFields,
+  teachingAssignmentId: uuid("teachingAssignmentId"),
   termId: uuid("termId"),
   classroomId: uuid("classroomId"),
   subjectId: uuid("subjectId"),
   teacherId: uuid("teacherId"),
+  categoryId: uuid("categoryId"),
   classSessionId: uuid("classSessionId").nullable().optional(),
   title: trimmedText("title"),
   type: z.enum(ASSESSMENT_TYPES),
   maxScore: z.number().finite().positive().max(99_999.99),
+  assessmentDate: isoDate,
   dueAt: isoDateTime.nullable().optional(),
+});
+
+export const updateAssessmentSchema = z.object({
+  ...tenantFields,
+  assessmentId: uuid("assessmentId"),
+  title: trimmedText("title").optional(),
+  categoryId: uuid("categoryId").optional(),
+  maxScore: z.number().finite().positive().max(99_999.99).optional(),
+  assessmentDate: isoDate.optional(),
+}).refine(
+  ({ title, categoryId, maxScore, assessmentDate }) =>
+    title !== undefined || categoryId !== undefined || maxScore !== undefined || assessmentDate !== undefined,
+  { message: "At least one assessment field must be updated." },
+);
+
+export const createScoreCategorySchema = z.object({
+  ...tenantFields,
+  teachingAssignmentId: uuid("teachingAssignmentId"),
+  termId: uuid("termId"),
+  name: trimmedText("name"),
+});
+
+export const updateScoreCategorySchema = z.object({
+  ...tenantFields,
+  categoryId: uuid("categoryId"),
+  name: trimmedText("name"),
 });
 
 export const updateScoreBatchSchema = z
@@ -267,7 +296,7 @@ export const updateScoreBatchSchema = z
       .array(
         z.object({
           studentId: uuid("studentId"),
-          value: z.number().finite().min(0),
+          value: z.number().finite().min(0).nullable(),
           feedback: nullableTrimmedText,
         }),
       )

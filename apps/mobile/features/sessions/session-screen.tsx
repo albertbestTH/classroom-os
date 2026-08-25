@@ -104,7 +104,7 @@ export function SessionScreen({ id, scoreSavedParam }: { id: string; scoreSavedP
     {attendance.isLoading ? <LoadingSkeleton /> : attendance.error || !attendanceSummary ? <ErrorState error={attendance.error} onRetry={() => void attendance.refetch()} /> : <AttendanceSummaryCard summary={attendanceSummary} />}
     <Card>
       {data.status === "live" ? <AppButton label={attendanceActionLabel(attendanceProgress, data.status)} accessibilityLabel={`${attendanceActionLabel(attendanceProgress, data.status)} บันทึกแล้ว ${attendanceProgress.recorded} จาก ${attendanceProgress.enrolled} คน`} onPress={() => router.push(`/sessions/${id}/attendance?classroomId=${data.classroomId}`)} /> : null}
-      {data.status === "live" ? <AppButton label="คะแนนด่วน" tone="secondary" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${data.teachingAssignmentId}&classroomId=${data.classroomId}`)} /> : null}
+      {data.status === "live" || data.status === "completed" ? <AppButton label="คะแนนด่วน" tone="secondary" onPress={() => router.push(`/sessions/${id}/scores?teachingAssignmentId=${data.teachingAssignmentId}&classroomId=${data.classroomId}`)} /> : null}
     </Card>
     <Card>
       <ThemedText style={styles.heading}>ไทม์ไลน์คาบเรียน</ThemedText>

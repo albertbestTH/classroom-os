@@ -229,6 +229,28 @@ export async function requireScoreAccess(
   await requireAssessmentAccess(context, assessmentId, classroomId);
 }
 
+export async function requireScoreCategoryAccess(
+  context: TrustedAuthContext | null | undefined,
+  categoryId: string,
+): Promise<void> {
+  const authenticated = requireAuthenticatedUser(context);
+  const category = await getPrismaClient().scoreCategory.findFirst({
+    where: { id: categoryId, schoolId: authenticated.schoolId },
+    select: {
+      schoolId: true,
+      termId: true,
+      teachingAssignment: { select: { classroomId: true, subjectId: true } },
+    },
+  });
+  if (!category) throw authError("FORBIDDEN", "The score category is not accessible.");
+  await requireTeachingAssignment(authenticated, {
+    schoolId: category.schoolId,
+    termId: category.termId,
+    classroomId: category.teachingAssignment.classroomId,
+    subjectId: category.teachingAssignment.subjectId,
+  });
+}
+
 export function trustedTenantInput<T extends object>(
   context: TrustedAuthContext | null | undefined,
   input: T,

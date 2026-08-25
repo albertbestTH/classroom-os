@@ -192,7 +192,9 @@ async function main(): Promise<void> {
       const cancelled = await createSession(cancelledEntry, shiftDate(baseDate, -14), "cancelled");
       const roster = rosters.get(completed.classroomId) ?? [];
       for (let index = 0; index < roster.length; index += 1) await tx.attendanceRecord.create({ data: { schoolId: school.id, classSessionId: completed.id, studentId: roster[index]!.id, recordedById: owner.id, status: index % 15 === 0 ? "leave" : index % 10 === 0 ? "late" : index % 12 === 0 ? "absent" : "present" } });
-      const assessment = await tx.assessment.create({ data: { schoolId: school.id, termId: term.id, classroomId: completed.classroomId, subjectId: completed.subjectId, teacherId: completed.teacherId, classSessionId: completed.id, title: "UAT participation check", type: "participation", maxScore: 10 } });
+      const completedAssignment = assignments.find((item) => item.id === completed.teachingAssignmentId)!;
+      const category = await tx.scoreCategory.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completedAssignment.id, name: "UAT Quick Score" } });
+      const assessment = await tx.assessment.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completedAssignment.id, categoryId: category.id, classroomId: completed.classroomId, subjectId: completed.subjectId, teacherId: completed.teacherId, classSessionId: completed.id, title: "UAT participation check", type: "participation", maxScore: 10, assessmentDate: new Date(`${shiftDate(baseDate, -7)}T00:00:00.000Z`) } });
       for (const [index, student] of roster.entries()) if (index < 8) await tx.score.create({ data: { schoolId: school.id, assessmentId: assessment.id, studentId: student.id, gradedById: completed.teacherId, value: index === 0 ? 0 : index === 1 ? 10 : index + 1 } });
       await tx.schoolHoliday.create({ data: { schoolId: school.id, localDate: new Date(`${shiftDate(baseDate, 2)}T00:00:00.000Z`), name: "UAT synthetic school holiday" } });
       return { school, teachers, classrooms, subjects, entries, scheduled, completed, cancelled };
