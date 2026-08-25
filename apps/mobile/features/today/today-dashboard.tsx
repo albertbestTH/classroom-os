@@ -1,5 +1,6 @@
 import type { CurrentUserResult, DashboardOverviewResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
@@ -10,6 +11,7 @@ import { useTheme } from "@/features/theme/theme-context";
 import { getApiBaseUrl } from "@/lib/environment";
 import { canStartScheduledSession } from "@/features/sessions/session-time";
 
+import { AttendanceScopePicker } from "./attendance-scope-picker";
 import { sortTodayClassesByStartTime } from "./today-presentation";
 
 const statusLabels = { scheduled: "รอเริ่ม", live: "กำลังสอน", completed: "เช็กชื่อแล้ว", cancelled: "ยกเลิก", missed: "เลยเวลา" } as const;
@@ -18,9 +20,9 @@ function timeLabel(value: string) {
   return new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(value));
 }
 
-function SectionTitle({ title, action }: { title: string; action?: string }) {
+function SectionTitle({ title, action }: { title: string; action?: ReactNode }) {
   const { colors } = useTheme();
-  return <View style={styles.sectionTitleRow}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>{action ? <Text style={[styles.sectionAction, { color: colors.primary }]}>{action}</Text> : null}</View>;
+  return <View style={styles.sectionTitleRow}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>{typeof action === "string" ? <Text style={[styles.sectionAction, { color: colors.primary }]}>{action}</Text> : action}</View>;
 }
 
 function MobileHeader({ user, actionCount }: { user: CurrentUserResult | null; actionCount: number }) {
@@ -63,7 +65,7 @@ function QuickActions({ live }: { live: TodayClassResult | null }) {
   return <View style={styles.quickGrid}>{quickActions.map((action) => <Pressable key={action.label} accessibilityRole="button" onPress={() => { if (action.label === "เช็กชื่อ" && live?.session) router.push(`/sessions/${live.session.id}/attendance?classroomId=${live.timetableEntry.classroomId}` as never); else router.push(action.route as never); }} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}><View style={[styles.quickIcon, { backgroundColor: action.soft }]}><AppIcon name={action.icon} color={action.color} size={21} /></View><Text style={[styles.quickLabel, { color: colors.text }]}>{action.label}</Text><Text numberOfLines={1} style={[styles.quickCaption, { color: colors.muted }]}>{action.caption}</Text></Pressable>)}</View>;
 }
 
-function AttendanceDonut({ overview }: { overview?: DashboardOverviewResult }) {
+function AttendanceDonut({ overview, selectedClassroomId, onClassroomChange }: { overview?: DashboardOverviewResult; selectedClassroomId?: string; onClassroomChange(value?: string): void }) {
   const { colors } = useTheme();
   if (!overview) return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}><SectionTitle title="ภาพรวมการเข้าเรียนวันนี้" /><Text style={[styles.emptyText, { color: colors.muted }]}>กำลังโหลดภาพรวมการเข้าเรียน…</Text></View>;
   const circumference = 2 * Math.PI * 45;
@@ -78,7 +80,7 @@ function AttendanceDonut({ overview }: { overview?: DashboardOverviewResult }) {
   ];
   let offset = 0;
   const percentage = overview.attendance.attendancePercentage;
-  return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}><SectionTitle title="ภาพรวมการเข้าเรียนวันนี้" /><View style={styles.attendanceBody}><View accessible accessibilityRole="image" accessibilityLabel={`มาเรียนหรือมาสาย ${percentage} เปอร์เซ็นต์ จาก ${eligible} คน`} style={styles.donutWrap}><Svg width={126} height={126} viewBox="0 0 120 120"><Circle cx="60" cy="60" r="45" fill="none" stroke={colors.border} strokeWidth="16" />{segments.map((segment) => { const value = eligible > 0 ? (totals[segment.key] / eligible) * 100 : 0; const segmentLength = (value / 100) * circumference; const circle = <Circle key={segment.key} cx="60" cy="60" r="45" fill="none" stroke={segment.color} strokeWidth="16" strokeDasharray={`${segmentLength} ${circumference - segmentLength}`} strokeDashoffset={-offset} rotation={-90} origin="60,60" />; offset += segmentLength; return circle; })}</Svg><View style={styles.donutCenter}><Text style={[styles.donutValue, { color: colors.text }]}>{percentage}%</Text><Text style={[styles.donutCaption, { color: colors.muted }]}>มาเรียน</Text></View></View><View style={styles.legend}>{segments.map((segment) => <View key={segment.key} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: segment.color }]} /><Text style={[styles.legendLabel, { color: colors.text }]}>{segment.label}</Text><Text style={[styles.legendValue, { color: colors.text }]}>{totals[segment.key]} คน</Text></View>)}</View></View></View>;
+  return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}><SectionTitle title="ภาพรวมการเข้าเรียนวันนี้" action={<AttendanceScopePicker options={overview.filterOptions.classrooms} value={selectedClassroomId} onChange={onClassroomChange} />} /><View style={styles.attendanceBody}><View accessible accessibilityRole="image" accessibilityLabel={`มาเรียนหรือมาสาย ${percentage} เปอร์เซ็นต์ จาก ${eligible} คน`} style={styles.donutWrap}><Svg width={126} height={126} viewBox="0 0 120 120"><Circle cx="60" cy="60" r="45" fill="none" stroke={colors.border} strokeWidth="16" />{segments.map((segment) => { const value = eligible > 0 ? (totals[segment.key] / eligible) * 100 : 0; const segmentLength = (value / 100) * circumference; const circle = <Circle key={segment.key} cx="60" cy="60" r="45" fill="none" stroke={segment.color} strokeWidth="16" strokeDasharray={`${segmentLength} ${circumference - segmentLength}`} strokeDashoffset={-offset} rotation={-90} origin="60,60" />; offset += segmentLength; return circle; })}</Svg><View style={styles.donutCenter}><Text style={[styles.donutValue, { color: colors.text }]}>{percentage}%</Text><Text style={[styles.donutCaption, { color: colors.muted }]}>มาเรียน</Text></View></View><View style={styles.legend}>{segments.map((segment) => <View key={segment.key} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: segment.color }]} /><Text style={[styles.legendLabel, { color: colors.text }]}>{segment.label}</Text><Text style={[styles.legendValue, { color: colors.text }]}>{totals[segment.key]} คน</Text></View>)}</View></View></View>;
 }
 
 function TodaySchedule({ data: rawData, now, onOpen }: { data: TodayTimetableResult; now: number; onOpen(item: TodayClassResult): void }) {
@@ -94,11 +96,11 @@ function PendingWork({ overview }: { overview?: DashboardOverviewResult }) {
   return <View><SectionTitle title="งานที่ต้องติดตาม" action="ดูทั้งหมด" /><View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>{actions.map((action, index) => <Pressable key={action.id} accessibilityRole="button" onPress={() => router.push((action.href.startsWith("/sessions/") ? action.href : "/(tabs)/classes") as never)} style={({ pressed }) => [styles.pendingRow, index > 0 && { borderTopColor: colors.border, borderTopWidth: 1 }, pressed && styles.pressed]}><View style={[styles.pendingIcon, { backgroundColor: action.priority === "high" ? colors.dangerSoft : colors.primarySoft }]}><AppIcon name="attendance" color={action.priority === "high" ? colors.danger : colors.primary} size={19} /></View><View style={styles.scheduleMain}><Text numberOfLines={1} style={[styles.scheduleSubject, { color: colors.text }]}>{action.title}</Text><Text numberOfLines={1} style={[styles.scheduleMeta, { color: colors.muted }]}>{action.description}</Text></View><Text style={[styles.priority, { color: action.priority === "high" ? colors.danger : colors.warning }]}>{action.priority === "high" ? "เร่งด่วน" : "ติดตาม"}</Text><AppIcon name="arrow" color={colors.muted} size={16} /></Pressable>)}</View></View>;
 }
 
-export function TodayDashboard({ user, data: rawData, overview, now, isOnline, isStarting, onOpen }: { user: CurrentUserResult | null; data: TodayTimetableResult; overview?: DashboardOverviewResult; now: number; isOnline: boolean; isStarting: boolean; onOpen(item: TodayClassResult): void }) {
+export function TodayDashboard({ user, data: rawData, overview, now, isOnline, isStarting, selectedClassroomId, onClassroomChange, onOpen }: { user: CurrentUserResult | null; data: TodayTimetableResult; overview?: DashboardOverviewResult; now: number; isOnline: boolean; isStarting: boolean; selectedClassroomId?: string; onClassroomChange(value?: string): void; onOpen(item: TodayClassResult): void }) {
   const data = { ...rawData, classes: sortTodayClassesByStartTime(rawData.classes) };
   const focus = data.classes.find((item) => item.status === "live") ?? data.classes.find((item) => item.status === "scheduled") ?? null;
   const focusIndex = focus ? Math.max(0, data.classes.findIndex((item) => item.timetableEntry.id === focus.timetableEntry.id)) : 0;
-  return <><MobileHeader user={user} actionCount={overview?.actions.length ?? data.missedCount + data.incompleteAttendanceCount} /><View style={styles.dashboardBody}><NextClassHero item={focus} index={focusIndex} now={now} isOnline={isOnline} isStarting={isStarting} onOpen={onOpen} /><QuickActions live={data.classes.find((item) => item.status === "live") ?? null} /><AttendanceDonut overview={overview} /><TodaySchedule data={data} now={now} onOpen={onOpen} /><PendingWork overview={overview} /></View></>;
+  return <><MobileHeader user={user} actionCount={overview?.actions.length ?? data.missedCount + data.incompleteAttendanceCount} /><View style={styles.dashboardBody}><NextClassHero item={focus} index={focusIndex} now={now} isOnline={isOnline} isStarting={isStarting} onOpen={onOpen} /><QuickActions live={data.classes.find((item) => item.status === "live") ?? null} /><AttendanceDonut overview={overview} selectedClassroomId={selectedClassroomId} onClassroomChange={onClassroomChange} /><TodaySchedule data={data} now={now} onOpen={onOpen} /><PendingWork overview={overview} /></View></>;
 }
 
 const styles = StyleSheet.create({

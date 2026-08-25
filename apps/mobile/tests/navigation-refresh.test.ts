@@ -9,10 +9,22 @@ describe("teacher navigation and refresh regressions", () => {
     expect(source("features/classes/classes-screen.tsx")).toContain("RefreshControl");
   });
 
-  it("keeps explicit exits from attendance, session summary, and class details", () => {
+  it("keeps explicit exits from attendance and class details without duplicating persistent tabs on session summary", () => {
     expect(source("features/attendance/attendance-screen.tsx")).toContain("กลับไปหน้าห้องเรียน");
-    expect(source("app/sessions/[id]/summary.tsx")).toContain("กลับไปหน้าวันนี้");
     expect(source("app/classes/[id].tsx")).toContain("กลับไปตารางสอน");
+    expect(source("app/sessions/[id]/summary.tsx")).not.toContain('label="กลับไปหน้าวันนี้"');
+    expect(source("app/sessions/[id]/summary.tsx")).not.toContain('label="ไปตารางสอน"');
+  });
+
+  it("preserves the selected timetable day when returning from class details", () => {
+    const classes = source("features/classes/classes-screen.tsx");
+    const detail = source("app/classes/[id].tsx");
+
+    expect(classes).toContain("returnWeekday=${activeWeekday}&returnView=${view}");
+    expect(classes).toContain('useLocalSearchParams<{ weekday?: string; view?: string }>()');
+    expect(detail).toContain("timetableReturnPath");
+    expect(detail).toContain("weekday=${weekdayNumber}&view=");
+    expect(detail).toContain("router.replace(timetableReturnPath as never)");
   });
 
   it("keeps offline mutations disabled in attendance and live session", () => {

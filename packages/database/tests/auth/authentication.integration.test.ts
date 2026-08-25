@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -10,6 +12,7 @@ import {
   requireSchoolAccess,
   requireScoreAccess,
   requireTeachingAssignment,
+  refreshMobileServerSession,
   resolveServerSession,
   revokeServerSession,
   trustedTenantInput,
@@ -86,6 +89,44 @@ describe("authentication and teacher authorization", () => {
       })
     ).map((event) => event.type);
     expect(eventTypes).toEqual(["LOGIN_FAILURE", "LOGIN_SUCCESS", "LOGOUT"]);
+  });
+
+  it("issues a longer revocable session only for the mobile login flow", async () => {
+    const tenant = await createSyntheticTenant(prisma, trackedSchoolIds, "auth-mobile-duration");
+    const password = "Synthetic!Mobile2026";
+    await prisma.user.update({
+      where: { id: tenant.user.id },
+      data: { passwordHash: await hashPassword(password) },
+    });
+
+    const beforeLogin = Date.now();
+    const webSession = await authenticateWithPassword({ email: tenant.user.email, password });
+    const mobileSession = await authenticateWithPassword(
+      { email: tenant.user.email, password },
+      { sessionKind: "mobile" },
+    );
+
+    expect(webSession.expiresAt.getTime() - beforeLogin).toBeGreaterThanOrEqual(11 * 60 * 60 * 1_000);
+    expect(webSession.expiresAt.getTime() - beforeLogin).toBeLessThanOrEqual(13 * 60 * 60 * 1_000);
+    expect(mobileSession.token).toMatch(/^mobile\.[A-Za-z0-9_-]{43}$/);
+    expect(mobileSession.expiresAt.getTime() - beforeLogin).toBeGreaterThanOrEqual(364 * 24 * 60 * 60 * 1_000);
+    expect(mobileSession.expiresAt.getTime() - beforeLogin).toBeLessThanOrEqual(366 * 24 * 60 * 60 * 1_000);
+
+    await expect(resolveServerSession(mobileSession.token)).resolves.toBeDefined();
+    const shortenedExpiry = new Date(Date.now() + 24 * 60 * 60 * 1_000);
+    await prisma.authSession.update({
+      where: { tokenHash: createHash("sha256").update(mobileSession.token).digest("hex") },
+      data: { expiresAt: shortenedExpiry },
+    });
+    const refreshed = await refreshMobileServerSession(mobileSession.token);
+    expect(refreshed.expiresAt.getTime() - Date.now()).toBeGreaterThanOrEqual(364 * 24 * 60 * 60 * 1_000);
+    await revokeServerSession(mobileSession.token);
+    await expect(resolveServerSession(mobileSession.token)).rejects.toSatisfy((error) =>
+      expectAuthCode(error, "UNAUTHENTICATED"),
+    );
+    await expect(refreshMobileServerSession(webSession.token)).rejects.toSatisfy((error) =>
+      expectAuthCode(error, "UNAUTHENTICATED"),
+    );
   });
 
   it("rejects disabled accounts and does not issue a session", async () => {
@@ -274,19 +315,28 @@ describe("authentication and teacher authorization", () => {
       expectAuthCode(error, "FORBIDDEN"),
     );
 
-    const createAssessment = (classroomId: string, title: string) =>
-      prisma.assessment.create({
+    const createAssessment = async (classroomId: string, title: string) => {
+      const teachingAssignmentId = classroomId === tenant.classroom.id
+        ? tenant.teachingAssignment.id
+        : classroomId === classB.id ? assignmentB.id : assignmentC.id;
+      const category = await prisma.scoreCategory.create({ data: {
+        schoolId: tenant.school.id, termId: tenant.term.id, teachingAssignmentId, name: title,
+      } });
+      return prisma.assessment.create({
         data: {
           schoolId: tenant.school.id,
           termId: tenant.term.id,
           teacherId: tenant.teacher.id,
           classroomId,
           subjectId: tenant.subject.id,
+          teachingAssignmentId,
+          categoryId: category.id,
           title,
           type: "quiz",
           maxScore: 10,
         },
       });
+    };
     const [assessmentA, assessmentB, assessmentC] = await Promise.all([
       createAssessment(tenant.classroom.id, "Synthetic A"),
       createAssessment(classB.id, "Synthetic B"),

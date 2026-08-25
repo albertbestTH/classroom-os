@@ -122,7 +122,7 @@ export async function requireApiSession(request: NextRequest): Promise<ResolvedS
 export function bearerTokenFromRequest(request: NextRequest): string | null {
   const authorization = request.headers.get("authorization");
   if (!authorization) return null;
-  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization);
+  const match = /^Bearer ((?:mobile\.)?[A-Za-z0-9_-]{43})$/.exec(authorization);
   if (!match?.[1]) throw authError("UNAUTHENTICATED", "Authentication is required.");
   return match[1];
 }

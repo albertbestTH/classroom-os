@@ -9,13 +9,19 @@ import { getPrismaClient } from "../client.js";
 import { authError } from "./auth-errors.js";
 import { verifyPassword } from "./password.js";
 
-const SESSION_DURATION_MS = 12 * 60 * 60 * 1_000;
+const WEB_SESSION_DURATION_MS = 12 * 60 * 60 * 1_000;
+const MOBILE_SESSION_DURATION_MS = 365 * 24 * 60 * 60 * 1_000;
+const MOBILE_TOKEN_PREFIX = "mobile.";
 const MAX_LOGIN_PASSWORD_LENGTH = 1_024;
 let dummyPasswordHash: string | undefined;
 
 export interface PasswordLoginInput {
   email: string;
   password: string;
+}
+
+export interface PasswordLoginOptions {
+  sessionKind?: "web" | "mobile";
 }
 
 export interface ServerSessionResult {
@@ -75,6 +81,7 @@ function mapCurrentUser(record: {
 
 export async function authenticateWithPassword(
   input: PasswordLoginInput,
+  options: PasswordLoginOptions = {},
 ): Promise<ServerSessionResult> {
   const prisma = getPrismaClient();
   const email = normalizeEmail(input.email);
@@ -127,10 +134,16 @@ export async function authenticateWithPassword(
     throw authError("ACCOUNT_DISABLED", "This account is not available.");
   }
 
-  const token = randomBytes(32).toString("base64url");
+  const opaqueValue = randomBytes(32).toString("base64url");
+  const token = options.sessionKind === "mobile"
+    ? `${MOBILE_TOKEN_PREFIX}${opaqueValue}`
+    : opaqueValue;
   const tokenHash = hashOpaqueValue(token);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_DURATION_MS);
+  const sessionDurationMs = options.sessionKind === "mobile"
+    ? MOBILE_SESSION_DURATION_MS
+    : WEB_SESSION_DURATION_MS;
+  const expiresAt = new Date(now.getTime() + sessionDurationMs);
 
   await prisma.$transaction([
     prisma.authSession.create({
@@ -190,6 +203,31 @@ export async function resolveServerSession(
     },
     user,
   };
+}
+
+export async function refreshMobileServerSession(
+  token: string | null | undefined,
+): Promise<ResolvedSessionResult & { expiresAt: Date }> {
+  const resolved = await resolveServerSession(token);
+  if (!token?.startsWith(MOBILE_TOKEN_PREFIX)) {
+    throw authError("UNAUTHENTICATED", "Authentication is required.");
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + MOBILE_SESSION_DURATION_MS);
+  const update = await getPrismaClient().authSession.updateMany({
+    where: {
+      tokenHash: hashOpaqueValue(token),
+      revokedAt: null,
+      expiresAt: { gt: now },
+    },
+    data: { expiresAt, lastSeenAt: now },
+  });
+  if (update.count !== 1) {
+    throw authError("UNAUTHENTICATED", "Authentication is required.");
+  }
+
+  return { ...resolved, expiresAt };
 }
 
 export async function revokeServerSession(

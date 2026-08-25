@@ -2,7 +2,7 @@
 
 ## Sign in and resume
 
-The teacher signs in with the school account. At startup, a stored session is validated with the server before protected screens render. Expired, revoked, disabled, or non-teacher sessions return to sign-in. Logout revokes the server session and clears local state.
+The teacher signs in with the school account. The revocable mobile session is stored in the device keychain/keystore and its one-year safety expiry rolls forward after each successful app-start validation. Normal ongoing use therefore does not require a monthly or periodic login. At startup, the stored session is validated with the server before protected screens render; a temporary network/server failure preserves the stored credential and available offline reads. An abandoned credential eventually expires, while revoked, disabled, or non-teacher sessions return to sign-in immediately. Logout revokes the server session and clears local state.
 
 ## Today and class session
 
@@ -19,5 +19,7 @@ After the server confirms a successful save, the draft and dirty state are clear
 Classes remain separate by teaching assignment, term, classroom, and subject even when labels repeat. The score area exposes only available teaching contexts until the backend offers the complete authorized score view needed for production editing.
 
 Quick participation scores use the native decimal keyboard and preserve an empty/ungraded value. The client rejects malformed, negative, non-finite, and over-maximum values before mutation while the existing service remains authoritative. Persisted invalid legacy values remain visible with an error and must be corrected before saving.
+
+Teachers may create or update Quick Score after a session is completed so end-of-period grading can be finished safely. Cancelled sessions remain read-only. Exact assignment access, enrollment checks, maximum-score validation, and audit logging continue to apply.
 
 Mobile displays LIVE only after the start API returns the canonical LIVE session. Start, end, attendance save, timetable coverage, and quick-score saves invalidate only related operational queries. Attendance summary separates recording completion from distribution: the ring accounts for the full enrolled roster, includes a neutral **ยังไม่บันทึก** segment for partial work, and shows total students in its center rather than a misleading completion percentage.

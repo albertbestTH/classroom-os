@@ -16,11 +16,11 @@ export default function TabLayout() {
   const { colors } = useTheme();
   if (state === "unauthenticated") return <Redirect href="/(auth)/login" />;
 
-  return <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { minHeight: 64, paddingTop: 6, backgroundColor: colors.surface, borderTopColor: colors.border }, tabBarLabelStyle: { fontFamily: "LINESeedSansTH", fontSize: 12, fontWeight: "600" } }}>
+  return <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { display: "none" }, tabBarLabelStyle: { fontFamily: "LINESeedSansTH", fontSize: 12, fontWeight: "600" } }}>
     <Tabs.Screen name="index" options={{ title: "วันนี้", tabBarIcon: TodayIcon }} />
     <Tabs.Screen name="classes" options={{ title: "ตารางสอน", tabBarIcon: TimetableIcon }} />
     <Tabs.Screen name="live" options={{ href: null }} />
-    <Tabs.Screen name="scores" options={{ href: null, title: "บันทึก", tabBarIcon: ScoresIcon }} />
+    <Tabs.Screen name="scores" options={{ title: "คะแนน", tabBarIcon: ScoresIcon }} />
     <Tabs.Screen name="profile" options={{ title: "โปรไฟล์", tabBarIcon: ProfileIcon }} />
   </Tabs>;
 }

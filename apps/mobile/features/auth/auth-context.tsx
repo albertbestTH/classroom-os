@@ -1,11 +1,12 @@
-import type { CurrentUserResult, MobileSessionResult } from "@classroom-os/types";
+import type { CurrentUserResult, MobileSessionResult, MobileSessionValidationResult } from "@classroom-os/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 
 import { apiRequest } from "@/lib/api-client";
-import { MobileApiError } from "@/lib/api-error";
 import { deleteMobileSession, readMobileSession, saveMobileSession } from "@/lib/auth-storage";
 import { clearPersistedQueries } from "@/lib/query-persistence";
+
+import { canRestoreCachedMobileSession, isStoredMobileSessionExpired } from "./session-policy";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated";
 type AuthContextValue = {
@@ -35,18 +36,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let active = true;
     void (async () => {
       const stored = await readMobileSession();
-      if (!stored || new Date(stored.expiresAt) <= new Date()) {
+      if (!stored || isStoredMobileSessionExpired(stored)) {
         await deleteMobileSession(); await clearPersistedQueries(); queryClient.clear();
         if (active) { setMessage(stored ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง" : null); setState("unauthenticated"); }
         return;
       }
       try {
-        const current = await apiRequest<CurrentUserResult>("/api/mobile/auth/session", { token: stored.token });
-        if (!canUseTeacherMobile(current)) throw new Error("Unsupported mobile role");
-        if (active) { setToken(stored.token); setUser(current); setState("authenticated"); }
+        const refreshed = await apiRequest<MobileSessionValidationResult>("/api/mobile/auth/session", { token: stored.token });
+        if (!canUseTeacherMobile(refreshed.user)) throw new Error("Unsupported mobile role");
+        await saveMobileSession({ token: stored.token, expiresAt: refreshed.expiresAt, user: refreshed.user });
+        if (active) { setToken(stored.token); setUser(refreshed.user); setState("authenticated"); }
       } catch (error) {
-        if (stored.user && error instanceof MobileApiError && (error.kind === "network" || error.kind === "timeout")) {
-          if (active) { setToken(stored.token); setUser(stored.user); setMessage("กำลังใช้งานแบบออฟไลน์"); setState("authenticated"); }
+        if (stored.user && canRestoreCachedMobileSession(error)) {
+          if (active) { setToken(stored.token); setUser(stored.user); setMessage("กำลังใช้งานข้อมูลที่บันทึกไว้ จะตรวจสอบเซสชันอีกครั้งเมื่อเชื่อมต่อได้"); setState("authenticated"); }
           return;
         }
         await deleteMobileSession(); await clearPersistedQueries(); queryClient.clear();

@@ -1,6 +1,6 @@
 import type { ClassSessionResult, ClassroomResult, TeachingAssignmentResult, TimetableCoverageResult, TimetableEntryResult, TodayClassResult, TodayTimetableResult } from "@classroom-os/types";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 
@@ -24,14 +24,18 @@ const weekdays = [
 type StatusFilter = "all" | "today" | "upcoming" | "completed";
 
 export function ClassesScreen() {
+  const routeParams = useLocalSearchParams<{ weekday?: string; view?: string }>();
   const { token, user } = useAuth();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
-  const [view, setView] = useState<"day" | "week">("day");
+  const [view, setView] = useState<"day" | "week">(routeParams.view === "week" ? "week" : "day");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
-  const [selectedWeekday, setSelectedWeekday] = useState<number | null>(null);
+  const [selectedWeekday, setSelectedWeekday] = useState<number | null>(() => {
+    const weekday = Number(routeParams.weekday);
+    return weekday >= 1 && weekday <= 5 ? weekday : null;
+  });
   const [now, setNow] = useState(0);
   useEffect(() => {
     const initial = setTimeout(() => setNow(Date.now()), 0);
@@ -123,7 +127,7 @@ export function ClassesScreen() {
           {todayClass?.status === "live" && todayClass.session ? <AppButton label="กลับเข้าสู่คาบที่กำลังสอน" onPress={() => router.push(`/sessions/${todayClass.session!.id}`)} /> : null}
           {todayClass?.status === "scheduled" ? <AppButton label={start.isPending ? "กำลังเริ่มคาบ…" : canStartScheduledSession(todayClass.scheduledStart, todayClass.scheduledEnd, now) ? "เริ่มคาบ" : "ยังไม่ถึงเวลาเริ่ม"} onPress={() => start.mutate(todayClass)} disabled={!isOnline || start.isPending || !canStartScheduledSession(todayClass.scheduledStart, todayClass.scheduledEnd, now)} /> : null}
           {todayClass?.status === "completed" && todayClass.session ? <AppButton label="ดูสรุปคาบ" tone="secondary" onPress={() => router.push(`/sessions/${todayClass.session!.id}/summary`)} /> : null}
-          {assignment ? <AppButton label="ดูรายละเอียดชั้นเรียน" tone="secondary" onPress={() => router.push(`/classes/${assignment.id}`)} /> : null}
+          {assignment ? <AppButton label="ดูรายละเอียดชั้นเรียน" tone="secondary" onPress={() => router.push(`/classes/${assignment.id}?returnWeekday=${activeWeekday}&returnView=${view}`)} /> : null}
         </Card>;
       })}</View>;
     }) : <EmptyState title="ไม่พบตารางสอน" description={search || filter !== "all" ? "ลองเปลี่ยนคำค้นหาหรือตัวกรอง" : "ติดต่อผู้ดูแลโรงเรียนเพื่อเพิ่มตารางสอน"} />}

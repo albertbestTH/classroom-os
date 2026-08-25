@@ -4,6 +4,7 @@ import {
   authenticateWithPassword,
   authError,
   normalizeEmail,
+  type PasswordLoginOptions,
   type PasswordLoginInput,
   type ServerSessionResult,
 } from "@classroom-os/database";
@@ -98,6 +99,7 @@ export function getClientIp(headers: Headers): string {
 export async function loginWithRateLimit(
   input: PasswordLoginInput,
   ipAddress: string,
+  options: PasswordLoginOptions = {},
 ): Promise<ServerSessionResult> {
   const limiter = getLoginRateLimiter();
   const decision = limiter.consume(input.email, ipAddress);
@@ -105,7 +107,7 @@ export async function loginWithRateLimit(
     throw authError("RATE_LIMITED", "Too many login attempts. Try again later.");
   }
 
-  const session = await authenticateWithPassword(input);
+  const session = await authenticateWithPassword(input, options);
   limiter.reset(input.email, ipAddress);
   return session;
 }

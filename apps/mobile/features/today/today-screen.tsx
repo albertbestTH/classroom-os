@@ -6,7 +6,7 @@ import type {
 } from "@classroom-os/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { RefreshControl } from "react-native";
 
 import {
@@ -36,21 +36,14 @@ export function TodayScreen() {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
   const [now, setNow] = useState(() => Date.now());
+  const [dashboardClassroomId, setDashboardClassroomId] = useState<string>();
   const today = useAuthenticatedQuery<TodayTimetableResult>(queryKeys.today, "/api/me/today");
 
-  const focusClassroomId = useMemo(() => {
-    const classes = today.data?.classes ?? [];
-    const focus = classes.find((item) => item.status === "live")
-      ?? classes.find((item) => item.status === "scheduled")
-      ?? classes.findLast((item) => item.status === "completed");
-    return focus?.timetableEntry.classroomId;
-  }, [today.data?.classes]);
-
-  const dashboardPath = focusClassroomId
-    ? `/api/dashboard/overview?classroomId=${encodeURIComponent(focusClassroomId)}`
+  const dashboardPath = dashboardClassroomId
+    ? `/api/dashboard/overview?classroomId=${encodeURIComponent(dashboardClassroomId)}`
     : "/api/dashboard/overview";
   const dashboard = useAuthenticatedQuery<DashboardOverviewResult>(
-    queryKeys.dashboard(focusClassroomId),
+    queryKeys.dashboard(dashboardClassroomId),
     dashboardPath,
     Boolean(today.data),
   );
@@ -142,6 +135,8 @@ export function TodayScreen() {
         now={now}
         isOnline={isOnline}
         isStarting={start.isPending}
+        selectedClassroomId={dashboardClassroomId}
+        onClassroomChange={setDashboardClassroomId}
         onOpen={openItem}
       />
     </SafeScreen>

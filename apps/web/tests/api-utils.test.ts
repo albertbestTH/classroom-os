@@ -2,7 +2,7 @@ import { DomainError } from "@classroom-os/database";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
-import { apiError, readJsonObject, withAuthenticatedApi } from "@/lib/api";
+import { apiError, bearerTokenFromRequest, readJsonObject, withAuthenticatedApi } from "@/lib/api";
 
 describe("API response and request security", () => {
   it.each([
@@ -35,6 +35,19 @@ describe("API response and request security", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "UNAUTHENTICATED" },
     });
+  });
+
+  it("accepts only the exact web and mobile bearer token formats", () => {
+    const opaqueValue = "a".repeat(43);
+    const request = (token: string) => new NextRequest("http://localhost/api/test", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(bearerTokenFromRequest(request(opaqueValue))).toBe(opaqueValue);
+    expect(bearerTokenFromRequest(request(`mobile.${opaqueValue}`))).toBe(`mobile.${opaqueValue}`);
+    expect(() => bearerTokenFromRequest(request(`other.${opaqueValue}`))).toThrowError(
+      expect.objectContaining({ code: "UNAUTHENTICATED" }),
+    );
   });
 
   it("rejects malformed, non-JSON, and oversized bodies", async () => {

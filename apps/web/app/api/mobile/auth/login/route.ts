@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     const session = await loginWithRateLimit(
       { email: requiredString(body, "email"), password: requiredString(body, "password") },
       getClientIp(request.headers),
+      { sessionKind: "mobile" },
     );
     const canUseTeacherMobile = session.user.role === "TEACHER" ||
       (session.user.workspaceType === "PERSONAL" && session.user.role === "SCHOOL_OWNER" && Boolean(session.user.teacherId));
