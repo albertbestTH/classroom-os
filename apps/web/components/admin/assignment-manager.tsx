@@ -5,52 +5,26 @@ import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 
 import { EmptyCollectionState } from "@/components/admin/admin-state";
+import { Toast, type ToastKind } from "@/components/toast";
 import { requestApi, thaiApiError } from "@/lib/client-api";
 
 const selectStyles = "min-h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20";
 
 export function AssignmentManager({ staffId, teachers, academicYears, terms, classrooms, subjects, assignments }: { staffId: string; teachers: StaffUserResult[]; academicYears: AcademicYearResult[]; terms: TermResult[]; classrooms: ClassroomResult[]; subjects: SubjectResult[]; assignments: TeachingAssignmentResult[] }) {
-  const router = useRouter();
-  const formId = useId();
+  const router = useRouter(); const formId = useId();
   const currentYear = academicYears.find((item) => item.isCurrent)?.id ?? academicYears[0]?.id ?? "";
-  const [yearId, setYearId] = useState(currentYear);
+  const [yearId, setYearId] = useState(currentYear); const [pending, setPending] = useState(false); const [error, setError] = useState<string | null>(null); const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
   const availableTerms = useMemo(() => terms.filter((term) => term.academicYearId === yearId), [terms, yearId]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); setPending(true); setError(null); try { await requestApi(`/api/staff/${staffId}/teaching-assignments`, { body: { termId: data.get("termId"), classroomId: data.get("classroomId"), subjectId: data.get("subjectId") } }); router.refresh(); setToast({ kind: "success", message: "บันทึกการตั้งค่างานสอนเรียบร้อยแล้ว" }); } catch (e) { const message = thaiApiError(e); setError(message); setToast({ kind: "error", message }); } finally { setPending(false); } }
+  return <div className="mt-8 space-y-6">
+    <form onSubmit={submit} className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm" aria-labelledby={`${formId}-heading`}><h2 id={`${formId}-heading`} className="text-lg font-bold">เพิ่มงานสอน</h2><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5"><div><label htmlFor={`${formId}-teacher`} className="mb-2 block text-sm font-semibold">ครู</label><select id={`${formId}-teacher`} value={staffId} onChange={(e) => router.push(`/staff/${e.target.value}/assignments`)} className={selectStyles}>{teachers.map((t) => <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}</select></div><div><label htmlFor={`${formId}-year`} className="mb-2 block text-sm font-semibold">ปีการศึกษา</label><select id={`${formId}-year`} value={yearId} onChange={(e) => setYearId(e.target.value)} className={selectStyles}>{academicYears.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select></div><div><label htmlFor={`${formId}-term`} className="mb-2 block text-sm font-semibold">ภาคเรียน</label><select id={`${formId}-term`} name="termId" required className={selectStyles}>{availableTerms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label htmlFor={`${formId}-classroom`} className="mb-2 block text-sm font-semibold">ห้องเรียน</label><select id={`${formId}-classroom`} name="classroomId" required className={selectStyles}>{classrooms.filter((x) => x.isActive).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div><div><label htmlFor={`${formId}-subject`} className="mb-2 block text-sm font-semibold">รายวิชา</label><select id={`${formId}-subject`} name="subjectId" required className={selectStyles}>{subjects.filter((x) => x.isActive).map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}</select></div></div>{error ? <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{error}</p> : null}<div className="mt-5 flex justify-end"><button type="submit" disabled={pending || availableTerms.length === 0} className="min-h-11 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">{pending ? "กำลังเพิ่ม…" : "เพิ่มงานสอน"}</button></div></form>
+    <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm" aria-labelledby="assignment-list-heading"><div className="border-b border-[#E5E7EB] px-5 py-4"><h2 id="assignment-list-heading" className="font-bold">งานสอนปัจจุบัน</h2></div>{assignments.length === 0 ? <EmptyCollectionState title="ยังไม่มีงานสอน" description="เลือกข้อมูลเพื่อเพิ่มงานสอนแรก" /> : <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-sm"><caption className="sr-only">รายการงานสอน</caption><thead className="bg-slate-50 text-[#6B7280]"><tr><th className="px-5 py-3.5">ห้องเรียน</th><th className="px-5 py-3.5">รายวิชา</th><th className="px-5 py-3.5">ภาคเรียน</th><th className="px-5 py-3.5">ปีการศึกษา</th><th className="px-5 py-3.5">การทำงาน</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((item) => <AssignmentRow key={item.id} item={item} onToast={setToast} />)}</tbody></table></div>}</section>
+    {toast ? <Toast kind={toast.kind} message={toast.message} onClose={() => setToast(null)} /> : null}
+  </div>;
+}
+
+function AssignmentRow({ item, onToast }: { item: TeachingAssignmentResult; onToast: (value: { kind: ToastKind; message: string }) => void }) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    setPending(true); setError(null);
-    try {
-      await requestApi<TeachingAssignmentResult>(`/api/staff/${staffId}/teaching-assignments`, {
-        body: { termId: data.get("termId"), classroomId: data.get("classroomId"), subjectId: data.get("subjectId") },
-      });
-      router.refresh();
-    } catch (submitError) { setError(thaiApiError(submitError)); }
-    finally { setPending(false); }
-  }
-
-  return (
-    <div className="mt-8 space-y-6">
-      <form onSubmit={submit} className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm" aria-labelledby={`${formId}-heading`}>
-        <h2 id={`${formId}-heading`} className="text-lg font-bold">เพิ่มงานสอน</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div><label htmlFor={`${formId}-teacher`} className="mb-2 block text-sm font-semibold">ครู</label><select id={`${formId}-teacher`} value={staffId} onChange={(event) => router.push(`/staff/${event.target.value}/assignments`)} className={selectStyles}>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</option>)}</select></div>
-          <div><label htmlFor={`${formId}-year`} className="mb-2 block text-sm font-semibold">ปีการศึกษา</label><select id={`${formId}-year`} value={yearId} onChange={(event) => setYearId(event.target.value)} className={selectStyles}>{academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></div>
-          <div><label htmlFor={`${formId}-term`} className="mb-2 block text-sm font-semibold">ภาคเรียน</label><select id={`${formId}-term`} name="termId" required className={selectStyles}>{availableTerms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select></div>
-          <div><label htmlFor={`${formId}-classroom`} className="mb-2 block text-sm font-semibold">ห้องเรียน</label><select id={`${formId}-classroom`} name="classroomId" required className={selectStyles}>{classrooms.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-          <div><label htmlFor={`${formId}-subject`} className="mb-2 block text-sm font-semibold">รายวิชา</label><select id={`${formId}-subject`} name="subjectId" required className={selectStyles}>{subjects.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></div>
-        </div>
-        {error ? <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{error}</p> : null}
-        <div className="mt-5 flex justify-between gap-4"><p className="text-xs text-[#6B7280]">ห้องเรียนและวิชาเดียวกันในคนละห้องจะถูกเก็บเป็นคนละงานสอน</p><button type="submit" disabled={pending || availableTerms.length === 0} className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-60">{pending ? "กำลังเพิ่ม…" : "เพิ่มงานสอน"}</button></div>
-      </form>
-
-      <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm" aria-labelledby="assignment-list-heading">
-        <div className="border-b border-[#E5E7EB] px-5 py-4"><h2 id="assignment-list-heading" className="font-bold">งานสอนปัจจุบัน</h2></div>
-        {assignments.length === 0 ? <EmptyCollectionState title="ยังไม่มีงานสอน" description="เลือกปี ภาคเรียน ห้องเรียน และรายวิชาเพื่อเพิ่มงานสอนแรก" /> : <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><caption className="sr-only">รายการงานสอนแยกตามห้องเรียน รายวิชา ภาคเรียน และปีการศึกษา</caption><thead className="bg-slate-50 text-[#6B7280]"><tr><th className="px-5 py-3.5" scope="col">ห้องเรียน</th><th className="px-5 py-3.5" scope="col">รายวิชา</th><th className="px-5 py-3.5" scope="col">ภาคเรียน</th><th className="px-5 py-3.5" scope="col">ปีการศึกษา</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((item) => <tr key={item.id}><th scope="row" className="px-5 py-4 font-semibold">{item.classroomName}</th><td className="px-5 py-4"><span className="font-mono text-xs text-[#6B7280]">{item.subjectCode}</span> · {item.subjectName}</td><td className="px-5 py-4">{item.termName}</td><td className="px-5 py-4">{item.academicYearName}</td></tr>)}</tbody></table></div>}
-        <p className="border-t border-[#E5E7EB] px-5 py-3 text-xs text-[#6B7280]">การลบงานสอนจะเพิ่มภายหลังเมื่อมีการตรวจสอบตารางสอนและข้อมูลชั้นเรียนที่อ้างอิงอย่างปลอดภัย</p>
-      </section>
-    </div>
-  );
+  async function remove() { if (!window.confirm(`ลบการตั้งค่างานสอนนี้?\nครู: ${item.teacherName}\nห้อง: ${item.classroomName}\nวิชา: ${item.subjectName}\nภาคเรียน: ${item.termName}`)) return; setPending(true); try { await requestApi(`/api/teaching-assignments/${item.id}`, { method: "DELETE" }); onToast({ kind: "success", message: "ลบการตั้งค่างานสอนเรียบร้อยแล้ว" }); window.location.reload(); } catch (e) { onToast({ kind: "error", message: thaiApiError(e) }); setPending(false); } }
+  return <tr><th scope="row" className="px-5 py-4 font-semibold">{item.classroomName}</th><td className="px-5 py-4">{item.subjectCode} · {item.subjectName}</td><td className="px-5 py-4">{item.termName}</td><td className="px-5 py-4">{item.academicYearName}</td><td className="px-5 py-4"><button type="button" onClick={remove} disabled={pending} className="min-h-10 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{pending ? "กำลังลบ…" : "ลบ"}</button></td></tr>;
 }

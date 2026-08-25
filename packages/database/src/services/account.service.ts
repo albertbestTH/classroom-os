@@ -20,6 +20,7 @@ import {
   assignTeacherProfileForSchool,
   createStaffUserForSchool,
   createTeachingAssignmentForSchool,
+  deleteTeachingAssignmentForSchool,
   listStaffUsersForSchool,
   listTeachingAssignmentsForSchool,
   requireStaffUserForSchool,
@@ -336,4 +337,32 @@ export async function getTeachingAssignment(
     }
     return toAssignmentResult(assignment);
   });
+}
+
+export async function deleteTeachingAssignment(
+  input: AuthenticatedServiceInput & { teachingAssignmentId: string },
+): Promise<void> {
+  const auth = requireAccountManager(input.auth);
+  const id = parseInput(assignmentIdSchema, input.teachingAssignmentId);
+  return withDomainErrors(() => getPrismaClient().$transaction(async (transaction) => {
+    try {
+      const assignment = await deleteTeachingAssignmentForSchool(transaction, {
+        schoolId: auth.schoolId,
+        teachingAssignmentId: id,
+      });
+      await createAuditLogForSchool(transaction, {
+        schoolId: auth.schoolId,
+        actorUserId: auth.userId,
+        action: "teaching_assignment.deleted",
+        entityType: "TeachingAssignment",
+        entityId: assignment.id,
+        metadata: { termId: assignment.termId, classroomId: assignment.classroomId, subjectId: assignment.subjectId },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Teaching assignment has timetable or historical sessions.") {
+        throw domainError("CONFLICT", "This teaching assignment has timetable or historical records and cannot be deleted.");
+      }
+      throw error;
+    }
+  }));
 }
