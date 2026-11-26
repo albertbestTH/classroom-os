@@ -114,9 +114,10 @@ async function deleteUatSchool(prisma: ReturnType<typeof createPrismaClient>): P
     await tx.classSession.deleteMany({ where });
     await tx.timetableCoverage.deleteMany({ where });
     await tx.timetableEntry.deleteMany({ where });
+    await tx.assessment.deleteMany({ where });
+    await tx.scoreCategory.deleteMany({ where });
     await tx.teachingAssignment.deleteMany({ where });
     await tx.classEnrollment.deleteMany({ where });
-    await tx.assessment.deleteMany({ where });
     await tx.passwordResetRequest.deleteMany({ where });
     await tx.emailChangeRequest.deleteMany({ where });
     await tx.authSession.deleteMany({ where });
@@ -143,7 +144,10 @@ async function main(): Promise<void> {
     await deleteUatSchool(prisma);
     const passwordHashes = await Promise.all([...teacherPasswords, managerPassword].map((password) => hashPassword(password)));
     const localToday = localDateParts();
-    const baseDate = localToday.weekday <= 5 ? localToday.iso : shiftDate(localToday.iso, 8 - localToday.weekday);
+    const baseDate = localToday.iso;
+    const schedule = SCHEDULE.map((definition, index) => index === 0
+      ? { ...definition, weekday: localToday.weekday, start: "00:01", end: "23:59" }
+      : definition);
 
     const result = await prisma.$transaction(async (tx) => {
       const school = await tx.school.create({ data: { code: UAT_SCHOOL_CODE, name: "UAT Classroom OS School", timezone: TIMEZONE, workspaceType: "SCHOOL" } });
@@ -173,28 +177,27 @@ async function main(): Promise<void> {
         rosters.set(classroom.id, students);
       }
       const entries: CreatedEntry[] = [];
-      for (const definition of SCHEDULE) {
+      for (const definition of schedule) {
         const teacher = teachers[definition.teacherIndex]!;
         const classroom = classrooms[definition.classroomIndex]!;
         const subject = subjects[definition.subjectIndex]!;
         const assignment = await tx.teachingAssignment.create({ data: { schoolId: school.id, termId: term.id, teacherId: teacher.id, classroomId: classroom.id, subjectId: subject.id } });
         entries.push(await tx.timetableEntry.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: assignment.id, teacherId: teacher.id, classroomId: classroom.id, subjectId: subject.id, weekday: definition.weekday, startTime: wallClock(definition.start), endTime: wallClock(definition.end), room: classroom.code } }));
       }
-      const mondayEntry = entries.find((entry) => entry.weekday === (localToday.weekday <= 5 ? localToday.weekday : 1)) ?? entries[0]!;
+      const goldenFlowEntry = entries[0]!;
       const completedEntry = entries[1]!;
       const cancelledEntry = entries[2]!;
       const createSession = async (entry: (typeof entries)[number], date: string, status: "scheduled" | "completed" | "cancelled") => {
-        const definition = SCHEDULE[entries.indexOf(entry)]!;
+        const definition = schedule[entries.indexOf(entry)]!;
         return tx.classSession.create({ data: { schoolId: school.id, termId: term.id, timetableEntryId: entry.id, teachingAssignmentId: entry.teachingAssignmentId, teacherId: entry.teacherId, classroomId: entry.classroomId, subjectId: entry.subjectId, scheduledStart: localDateTime(date, definition.start), scheduledEnd: localDateTime(date, definition.end), status, ...(status === "completed" ? { startedAt: localDateTime(date, definition.start), endedAt: localDateTime(date, definition.end) } : {}), ...(status === "cancelled" ? { cancelledAt: localDateTime(date, definition.start), cancellationReason: "UAT synthetic cancellation scenario" } : {}) } });
       };
-      const scheduled = await createSession(mondayEntry, baseDate, "scheduled");
+      const scheduled = await createSession(goldenFlowEntry, baseDate, "scheduled");
       const completed = await createSession(completedEntry, shiftDate(baseDate, -7), "completed");
       const cancelled = await createSession(cancelledEntry, shiftDate(baseDate, -14), "cancelled");
       const roster = rosters.get(completed.classroomId) ?? [];
       for (let index = 0; index < roster.length; index += 1) await tx.attendanceRecord.create({ data: { schoolId: school.id, classSessionId: completed.id, studentId: roster[index]!.id, recordedById: owner.id, status: index % 15 === 0 ? "leave" : index % 10 === 0 ? "late" : index % 12 === 0 ? "absent" : "present" } });
-      const completedAssignment = assignments.find((item) => item.id === completed.teachingAssignmentId)!;
-      const category = await tx.scoreCategory.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completedAssignment.id, name: "UAT Quick Score" } });
-      const assessment = await tx.assessment.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completedAssignment.id, categoryId: category.id, classroomId: completed.classroomId, subjectId: completed.subjectId, teacherId: completed.teacherId, classSessionId: completed.id, title: "UAT participation check", type: "participation", maxScore: 10, assessmentDate: new Date(`${shiftDate(baseDate, -7)}T00:00:00.000Z`) } });
+      const category = await tx.scoreCategory.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completed.teachingAssignmentId, name: "UAT Quick Score" } });
+      const assessment = await tx.assessment.create({ data: { schoolId: school.id, termId: term.id, teachingAssignmentId: completed.teachingAssignmentId, categoryId: category.id, classroomId: completed.classroomId, subjectId: completed.subjectId, teacherId: completed.teacherId, classSessionId: completed.id, title: "UAT participation check", type: "participation", maxScore: 10, assessmentDate: new Date(`${shiftDate(baseDate, -7)}T00:00:00.000Z`) } });
       for (const [index, student] of roster.entries()) if (index < 8) await tx.score.create({ data: { schoolId: school.id, assessmentId: assessment.id, studentId: student.id, gradedById: completed.teacherId, value: index === 0 ? 0 : index === 1 ? 10 : index + 1 } });
       await tx.schoolHoliday.create({ data: { schoolId: school.id, localDate: new Date(`${shiftDate(baseDate, 2)}T00:00:00.000Z`), name: "UAT synthetic school holiday" } });
       return { school, teachers, classrooms, subjects, entries, scheduled, completed, cancelled };
